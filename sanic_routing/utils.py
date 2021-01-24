@@ -25,7 +25,7 @@ def parse_parameter_basket(route, basket):
     return params, raw_path
 
 
-def parts_to_path(parts):
+def parts_to_path(parts, delimiter="/"):
     path = []
     for part in parts:
         if part.startswith("<"):
@@ -33,4 +33,4 @@ def parts_to_path(parts):
             path.append(f"<{match.group(1)}>")
         else:
             path.append(part)
-    return "/".join(path)
+    return delimiter.join(path)

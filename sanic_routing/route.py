@@ -22,7 +22,7 @@ class Route:
         self.raw_paths = set()
 
         parts = tuple(raw_path.split(self.router.delimiter))
-        self.path = parts_to_path(parts)
+        self.path = parts_to_path(parts, delimiter=self.router.delimiter)
         self.parts = tuple(self.path.split(self.router.delimiter))
         self.static = "<" not in self.path
 
@@ -36,7 +36,7 @@ class Route:
 
     def get_handler(self, raw_path, method, **kwargs):
         method = method or self.router.DEFAULT_METHOD
-        raw_path = raw_path.lstrip("/")
+        raw_path = raw_path.lstrip(self.router.delimiter)
         try:
             return self.handlers[raw_path][method]
         except KeyError:
@@ -45,15 +45,11 @@ class Route:
             )
 
     def add_handler(self, raw_path, handler, method):
-        if self.static and self.handlers:
-            raise RouteExists(
-                f"Route already registered: {raw_path} [{method}]"
-            )
-
         if method in self.handlers.get(raw_path, {}):
             raise RouteExists(
                 f"Route already registered: {raw_path} [{method}]"
             )
+
         self.handlers[raw_path][method.upper()] = handler
 
         if not self.static:

@@ -41,6 +41,7 @@ class Node:
                 child.finalize_children()
 
     def display(self) -> None:
+        """This is TEMP"""
         print(" " * 4 * self.level, self)
         for child in self.children.values():
             child.display()
@@ -68,7 +69,7 @@ class Node:
         if self.first or self.root:
             operation = ">"
             use_level = level
-            if self.last:
+            if self.last and not self.level == 1:
                 use_level = self.level
                 operation = "=="
                 equality_check = True
@@ -112,6 +113,9 @@ class Node:
             )
         return src, delayed
 
+    def add_child(self, child: "Node") -> None:
+        self._children[child.part] = child
+
     @staticmethod
     def _sorting(item) -> t.Tuple[bool, int, str]:
         key, child = item
@@ -130,7 +134,7 @@ class Tree:
             current = self.root
             for level, part in enumerate(route.parts):
                 if part not in current._children:
-                    current._children[part] = Node(part=part, parent=current)
+                    current.add_child(Node(part=part, parent=current))
                 current = current._children[part]
                 current.level = level + 1
 
