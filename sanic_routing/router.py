@@ -97,6 +97,10 @@ class BaseRouter(ABC):
             route.add_handler(path, handler, method)
 
     def finalize(self, do_compile: bool = True):
+        if not len(self.static_routes) + len(self.dynamic_routes):
+            # TODO:
+            # - Better exception
+            raise Exception("Cannot finalize")
         self.finalized = True
         self._generate_tree()
         self._render(do_compile)

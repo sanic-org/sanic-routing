@@ -1,6 +1,17 @@
+import uuid
+from datetime import date
+
 import pytest
 from sanic_routing import BaseRouter
-from sanic_routing.exceptions import RouteExists
+from sanic_routing.exceptions import NotFound, RouteExists
+
+
+@pytest.fixture
+def handler():
+    def handler(**kwargs):
+        return list(kwargs.values())[0]
+
+    return handler
 
 
 class Router(BaseRouter):
@@ -62,17 +73,30 @@ def test_add_duplicate_route_alt_method():
     assert len(dynamic_handlers[1]) == 1
 
 
-def test_cast_types():
-    def handler(bar):
-        return bar
+def test_route_does_not_exist():
+    router = Router()
+    router.add("/foo", handler)
+    router.finalize()
 
+    with pytest.raises(NotFound):
+        router.get("/path/to/nothing", "BASE")
+
+
+def test_method_does_not_exist():
+    router = Router()
+    router.add("/foo", handler)
+    router.finalize()
+
+    with pytest.raises(NotFound):
+        router.get("/foo", "XXXXXXX")
+
+
+def test_cast_types_at_same_position(handler):
     router = Router()
     router.add("/foo/<bar>", handler)
     router.add("/foo/<bar:int>", handler)
 
     router.finalize()
-    router.tree.display()
-    print(router.find_route_src)
 
     string_bar = router.get("/foo/something", "BASE")
     int_bar = router.get("/foo/111", "BASE")
@@ -84,3 +108,26 @@ def test_cast_types():
     int_retval = int_bar[1](**int_bar[2])
     assert isinstance(int_retval, int)
     assert int_retval == 111
+
+
+@pytest.mark.parametrize(
+    "label,value,cast_type",
+    (
+        ("string", "foo", str),
+        ("int", 11111, int),
+        ("number", 99.99, float),
+        ("alpha", "ABCxyz", str),
+        ("path", "path/to/file.txt", str),
+        ("ymd", "2021-01-01", date),
+        ("uuid", uuid.uuid4(), uuid.UUID),
+    ),
+)
+def test_casting(handler, label, value, cast_type):
+    router = Router()
+    router.add(f"/<foo:{label}>", handler)
+
+    router.finalize()
+    _, handler, params = router.get(f"/{value}", "BASE")
+    retval = handler(**params)
+
+    assert isinstance(retval, cast_type)
