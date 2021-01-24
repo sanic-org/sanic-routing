@@ -116,6 +116,10 @@ class BaseRouter(ABC):
         ]
 
         if self.static_routes:
+            # TODO:
+            # - future improvement would be to decide which option to use
+            #   at runtime based upon the makeup of the router since this
+            #   potentially has an impact on performance
             # src += [
             #     Line("try:", 1),
             #     Line("return router.static_routes[path], None", 2),
@@ -156,7 +160,8 @@ class BaseRouter(ABC):
     @staticmethod
     def optimize(src: t.List[Line]) -> None:
         """
-        Insert NotFound exceptions to be able to bail as quick as possible
+        Insert NotFound exceptions to be able to bail as quick as possible,
+        and realign lines to proper indentation
         """
         offset = 0
         current = 0

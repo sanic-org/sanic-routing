@@ -41,6 +41,7 @@ class Node:
                 child.finalize_children()
 
     def display(self) -> None:
+        print(" " * 4 * self.level, self)
         for child in self.children.values():
             child.display()
 
@@ -79,6 +80,8 @@ class Node:
                 src.append(
                     Line(f"basket[{level}] = parts[{level}]", indent + 1)
                 )
+                # This is a control line to help control indentation, but
+                # it should not be rendered
                 src.append(Line("...", 0, offset=-1, render=False))
         else:
             # "if" if (self.parent and self.parent.first)
