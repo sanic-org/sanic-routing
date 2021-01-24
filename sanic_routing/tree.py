@@ -69,7 +69,7 @@ class Node:
         if self.first or self.root:
             operation = ">"
             use_level = level
-            if self.last and not self.level == 1:
+            if self.last and not self.level == 1 and not self.children:
                 use_level = self.level
                 operation = "=="
                 equality_check = True
