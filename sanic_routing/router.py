@@ -40,7 +40,6 @@ class BaseRouter(ABC):
     def resolve(self, path: str, *, method: t.Optional[str] = None):
         parts = tuple(path[1:].split(self.delimiter))
         route, param_basket = self.find_route(parts, self, {})
-        args = []
         params = {}
         handler = None
 
@@ -51,11 +50,9 @@ class BaseRouter(ABC):
                 params, raw_path = parse_parameter_basket(route, param_basket)
             except ValueError:
                 raise self.exception
-            if method:
-                args.append(method)
 
         handler = route.get_handler(raw_path, method)
-        return route, handler, args, params
+        return route, handler, params
 
     def add(
         self,
@@ -142,7 +139,7 @@ class BaseRouter(ABC):
 
         self.optimize(src)
 
-        self.find_route_src = "\n".join(
+        self.find_route_src = "".join(
             map(str, filter(lambda x: x.render, src))
         )
         if do_compile:

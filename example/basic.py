@@ -1,6 +1,19 @@
+from dataclasses import dataclass, field
 from functools import partial
+from typing import Optional
 
 from sanic_routing import BaseRouter
+from sanic_routing.route import Route
+
+
+@dataclass
+class FakeRequest:
+    path: str
+    method: str
+    route: Optional[Route] = field(default=None)
+
+    def __hash__(self) -> int:
+        return hash(f"{self.method} {self.path}")
 
 
 class Router(BaseRouter):
@@ -15,8 +28,8 @@ class Router(BaseRouter):
         "DELETE",
     )
 
-    def get(self, path, *args, **kwargs):
-        return self.resolve(path, *args, **kwargs)
+    def get(self, request: FakeRequest):
+        return self.resolve(request.path, method=request.method)
 
 
 def handler(*args, **kwargs):
@@ -42,7 +55,10 @@ router.tree.display()
 print(router.find_route_src)
 print(f"{router.static_routes=}")
 print(f"{router.dynamic_routes=}")
-route, handler, args, params = router.get("/foo/2021-01-01")
+request = FakeRequest("/foo/2021-01-01", "GET")
+route, handler, params = router.get(request)
+request.route = route
+args = (request,)
 print(f"{route=}")
 print(f"{handler=}")
 print(f"{args=}")

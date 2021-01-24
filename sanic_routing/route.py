@@ -34,14 +34,6 @@ class Route:
         )
         return f"<Route: {display}>"
 
-    # def __call__(self, raw_path, method="base", **kwargs):
-    #     try:
-    #         return self.handlers[raw_path][method](**kwargs)
-    #     except KeyError:
-    #         raise self.router.method_handler_exception(
-    #             f"Method '{method}' not found on {self}"
-    #         )
-
     def get_handler(self, raw_path, method, **kwargs):
         method = method or self.router.DEFAULT_METHOD
         raw_path = raw_path.lstrip("/")
