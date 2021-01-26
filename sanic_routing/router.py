@@ -1,6 +1,5 @@
 import typing as t
 from abc import ABC, abstractmethod
-from functools import lru_cache
 from itertools import count
 
 from .exceptions import NotFound
@@ -22,10 +21,9 @@ class BaseRouter(ABC):
         exception: t.Type[Exception] = NotFound,
         method_handler_exception: t.Type[Exception] = NotFound,
     ) -> None:
-        self.static_routes: t.Dict[t.Union[str, t.Tuple[str, ...]], Route] = {}
-        self.dynamic_routes: t.Dict[
-            t.Union[str, t.Tuple[str, ...]], Route
-        ] = {}
+        self.static_routes: t.Dict[t.Tuple[str, ...], Route] = {}
+        self.dynamic_routes: t.Dict[t.Tuple[str, ...], Route] = {}
+        self.name_index: t.Dict[str, Route] = {}
         self.delimiter = delimiter
         self.exception = exception
         self.method_handler_exception = method_handler_exception
@@ -36,7 +34,6 @@ class BaseRouter(ABC):
     def get(self):
         ...
 
-    @lru_cache
     def resolve(self, path: str, *, method: t.Optional[str] = None):
         parts = tuple(path[1:].split(self.delimiter))
         route, param_basket = self.find_route(parts, self, {})
@@ -58,22 +55,29 @@ class BaseRouter(ABC):
         self,
         path: str,
         handler: t.Callable,
-        methods: t.Optional[t.Union[t.List[str], str]] = None,
+        methods: t.Optional[t.Union[t.Iterable[str], str]] = None,
         name: t.Optional[str] = None,
         requirements: t.Optional[t.Dict[str, t.Any]] = None,
-    ) -> None:
+    ) -> Route:
         if not methods:
             methods = [self.DEFAULT_METHOD]
 
-        if not isinstance(methods, (list, tuple, set)):
-            methods = [methods]
+        if hasattr(methods, "__iter__") and not isinstance(methods, frozenset):
+            methods = frozenset(methods)
+        elif isinstance(methods, str):
+            methods = frozenset([methods])
 
         if self.ALLOWED_METHODS and any(
             method not in self.ALLOWED_METHODS for method in methods
         ):
             # TODO:
             # - Better exception
-            raise Exception("bad method")
+            bad = [
+                method
+                for method in methods
+                if method not in self.ALLOWED_METHODS
+            ]
+            raise Exception(f"bad method: {bad}")
 
         if self.finalized:
             # TODO:
@@ -86,15 +90,20 @@ class BaseRouter(ABC):
         path = path.strip(self.delimiter)
         route = Route(self, path, name, requirements)
 
+        # TODO"
+        # - Add some testing coverage on this
         if route.parts in routes:
             route = routes[route.parts]
         else:
             routes[route.parts] = route
-            if name:
-                routes[name] = route
+
+        if name:
+            self.name_index[name] = route
 
         for method in methods:
             route.add_handler(path, handler, method)
+
+        return route
 
     def finalize(self, do_compile: bool = True):
         if not len(self.static_routes) + len(self.dynamic_routes):

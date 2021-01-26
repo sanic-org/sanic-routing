@@ -1,5 +1,6 @@
 import typing as t
 from collections import defaultdict, namedtuple
+from types import SimpleNamespace
 
 from sanic.exceptions import InvalidUsage
 
@@ -20,6 +21,7 @@ class Route:
         self.handlers = defaultdict(dict)
         self._params = defaultdict(list)
         self.raw_paths = set()
+        self.ctx = SimpleNamespace()
 
         parts = tuple(raw_path.split(self.router.delimiter))
         self.path = parts_to_path(parts, delimiter=self.router.delimiter)
@@ -28,9 +30,9 @@ class Route:
 
     def __repr__(self):
         display = (
-            f"{self.name}|{self.path}"
+            f"[{self.name}]{self.path or '/'}"
             if self.name and self.name != self.path
-            else self.path
+            else self.path or "/"
         )
         return f"<Route: {display}>"
 

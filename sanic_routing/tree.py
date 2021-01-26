@@ -127,9 +127,7 @@ class Tree:
         self.root = Node(root=True)
         self.root.level = 0
 
-    def generate(
-        self, routes: t.Dict[t.Union[str, t.Tuple[str, ...]], Route]
-    ) -> None:
+    def generate(self, routes: t.Dict[t.Tuple[str, ...], Route]) -> None:
         for route in routes.values():
             current = self.root
             for level, part in enumerate(route.parts):
