@@ -102,6 +102,8 @@ class Node:
 
         if self.route:
             location = delayed if self.children else src
+            if self.route.requirements:
+                self._inject_requirements(location, indent + 1 + bool(not self.children))
             location.append(
                 Line(
                     (
@@ -115,6 +117,42 @@ class Node:
 
     def add_child(self, child: "Node") -> None:
         self._children[child.part] = child
+
+    def _inject_requirements(self, location, indent):
+        for idx, reqs in self.route.requirements.items():
+            conditional = "if" if idx == 0 else "elif"
+            location.extend([
+
+                Line(
+                    (
+                        f"{conditional} extra == {reqs}:"
+                    ),
+                    indent
+                ),
+                Line(
+                    (
+                        f"basket['__handler_idx__'] = {idx}"
+                    ),
+                    indent + 1
+                )
+            ]
+            )
+        location.extend([
+
+                Line(
+                    (
+                        "else:"
+                    ),
+                    indent
+                ),
+                Line(
+                    (
+                        "raise NotFound('no match reqs')"
+                    ),
+                    indent + 1
+                )
+            ]
+            )
 
     @staticmethod
     def _sorting(item) -> t.Tuple[bool, int, str]:

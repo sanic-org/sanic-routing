@@ -44,7 +44,7 @@ class BaseRouter(ABC):
     ):
         parts = tuple(path[1:].split(self.delimiter))
         try:
-            route, param_basket = self.find_route(parts, self, {})
+            route, param_basket = self.find_route(parts, self, {"__handler_idx__": 0}, extra)
         except NotFound as e:
             if path.endswith(self.delimiter):
                 return self.resolve(path=path[:-1], method=method, orig=path)
@@ -64,12 +64,9 @@ class BaseRouter(ABC):
             raise self.exception("...1", path=path)
 
 
-        handler = route.get_handler(raw_path, method)
-        for requirements, func in handler.handler_funcs:
-            if requirements != extra:
-                return route, func, params
+        handler = route.get_handler(raw_path, method, param_basket["__handler_idx__"])
 
-        raise self.exception("...2", path=path)
+        return route, handler, params
 
     def add(
         self,
@@ -105,7 +102,7 @@ class BaseRouter(ABC):
             # - Better exception
             raise Exception("finalized")
 
-        static = "<" not in path
+        static = "<" not in path and not requirements
         routes = self.static_routes if static else self.dynamic_routes
 
         strip = path.lstrip if strict else path.strip
@@ -146,7 +143,7 @@ class BaseRouter(ABC):
 
     def _render(self, do_compile: bool = True) -> None:
         src = [
-            Line("def find_route(parts, router, basket):", 0),
+            Line("def find_route(parts, router, basket, extra):", 0),
         ]
 
         if self.static_routes:
@@ -162,7 +159,7 @@ class BaseRouter(ABC):
             # ]
             src += [
                 Line("if parts in router.static_routes:", 1),
-                Line("return router.static_routes[parts], None", 2),
+                Line("return router.static_routes[parts], basket", 2),
             ]
             # src += [
             #     Line("if path in router.static_routes:", 1),
