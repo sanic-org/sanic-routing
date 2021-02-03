@@ -2,23 +2,44 @@ import typing as t
 from collections import defaultdict, namedtuple
 from types import SimpleNamespace
 
-from sanic.exceptions import InvalidUsage
-
-from .exceptions import RouteExists
+from .exceptions import InvalidUsage, RouteExists
 from .patterns import REGEX_TYPES
 from .utils import parts_to_path
+
+# from sanic.exceptions import InvalidUsage
+
 
 ParamInfo = namedtuple(
     "ParamInfo", ("name", "raw_path", "label", "cast", "pattern")
 )
 
 
+class Handler:
+    # def __init__(self, func, requirements):
+    #     self.mapping = {
+    #         Requirements(requirements): func
+    #     }
+    # def add(self, func, requirements):
+    #     self.mapping.update({
+    #         Requirements(requirements): func
+    #     })
+    def __init__(self, func, requirements):
+        self.handler_funcs = [(requirements, func)]
+
+    def add(self, func, requirements):
+        self.handler_funcs.append((requirements, func))
+
+class Requirements(dict):
+    def __hash__(self):
+        return hash((frozenset(self), frozenset(self.values())))
+
 class Route:
-    def __init__(self, router, raw_path, name, requirements):
+    def __init__(
+        self, router, raw_path, name, strict: bool = False
+    ):
         self.router = router
         self.name = name
-        self.requirements = requirements
-        self.handlers = defaultdict(dict)
+        self.handlers = defaultdict(lambda: defaultdict(dict))
         self._params = defaultdict(list)
         self.raw_paths = set()
         self.ctx = SimpleNamespace()
@@ -27,6 +48,7 @@ class Route:
         self.path = parts_to_path(parts, delimiter=self.router.delimiter)
         self.parts = tuple(self.path.split(self.router.delimiter))
         self.static = "<" not in self.path
+        self.strict: bool = strict
 
     def __repr__(self):
         display = (
@@ -43,16 +65,34 @@ class Route:
             return self.handlers[raw_path][method]
         except KeyError:
             raise self.router.method_handler_exception(
-                f"Method '{method}' not found on {self}"
+                f"Method '{method}' not found on {self}",
+                method=method,
+                allowed_methods=set(self.handlers[raw_path].keys()),
             )
 
-    def add_handler(self, raw_path, handler, method):
-        if method in self.handlers.get(raw_path, {}):
-            raise RouteExists(
-                f"Route already registered: {raw_path} [{method}]"
-            )
+    def add_handler(self, raw_path, handler, method, requirements):
+        # existing =self.handlers.get(raw_path, {})
+        # if method in existing and Requirements(requirements) in existing[method]:
+        #     req = f":{requirements}" if requirements else ""
+        #     raise RouteExists(
+        #         f"Route already registered: {raw_path} [{method}{req}]"
+        #     )
 
-        self.handlers[raw_path][method.upper()] = handler
+        # self.handlers[raw_path][method.upper()][Requirements(requirements or {})] = Handler(handler, requirements)
+        existing =self.handlers.get(raw_path, {})
+        # TODO:
+        # - Enable existing check
+        # - check method and requirements
+        # if method in existing:
+        #     req = f":{requirements}" if requirements else ""
+        #     raise RouteExists(
+        #         f"Route already registered: {raw_path} [{method}{req}]"
+        #     )
+
+        if existing and existing[method.upper()]:
+            existing[method.upper()].add(handler, requirements)
+        else:
+            self.handlers[raw_path][method.upper()] = Handler(handler, requirements)
 
         if not self.static:
             parts = tuple(raw_path.split(self.router.delimiter))

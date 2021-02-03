@@ -2,7 +2,7 @@ import typing as t
 from abc import ABC, abstractmethod
 from itertools import count
 
-from .exceptions import NotFound
+from .exceptions import NoMethod, NotFound
 from .line import Line
 from .route import Route
 from .tree import Tree
@@ -18,8 +18,8 @@ class BaseRouter(ABC):
     def __init__(
         self,
         delimiter: str = "/",
-        exception: t.Type[Exception] = NotFound,
-        method_handler_exception: t.Type[Exception] = NotFound,
+        exception: t.Type[NotFound] = NotFound,
+        method_handler_exception: t.Type[NoMethod] = NoMethod,
     ) -> None:
         self.static_routes: t.Dict[t.Tuple[str, ...], Route] = {}
         self.dynamic_routes: t.Dict[t.Tuple[str, ...], Route] = {}
@@ -34,9 +34,21 @@ class BaseRouter(ABC):
     def get(self):
         ...
 
-    def resolve(self, path: str, *, method: t.Optional[str] = None):
+    def resolve(
+        self,
+        path: str,
+        *,
+        method: t.Optional[str] = None,
+        orig: t.Optional[str] = None,
+        extra: t.Optional[t.Dict[str,str]] = None,
+    ):
         parts = tuple(path[1:].split(self.delimiter))
-        route, param_basket = self.find_route(parts, self, {})
+        try:
+            route, param_basket = self.find_route(parts, self, {})
+        except NotFound as e:
+            if path.endswith(self.delimiter):
+                return self.resolve(path=path[:-1], method=method, orig=path)
+            raise self.exception(e, path=path)
         params = {}
         handler = None
 
@@ -48,8 +60,16 @@ class BaseRouter(ABC):
             except ValueError:
                 raise self.exception
 
+        if route.strict and orig and orig[-1] != route.path[-1]:
+            raise self.exception("...1", path=path)
+
+
         handler = route.get_handler(raw_path, method)
-        return route, handler, params
+        for requirements, func in handler.handler_funcs:
+            if requirements != extra:
+                return route, func, params
+
+        raise self.exception("...2", path=path)
 
     def add(
         self,
@@ -58,6 +78,7 @@ class BaseRouter(ABC):
         methods: t.Optional[t.Union[t.Iterable[str], str]] = None,
         name: t.Optional[str] = None,
         requirements: t.Optional[t.Dict[str, t.Any]] = None,
+        strict: bool = False,
     ) -> Route:
         if not methods:
             methods = [self.DEFAULT_METHOD]
@@ -87,8 +108,9 @@ class BaseRouter(ABC):
         static = "<" not in path
         routes = self.static_routes if static else self.dynamic_routes
 
-        path = path.strip(self.delimiter)
-        route = Route(self, path, name, requirements)
+        strip = path.lstrip if strict else path.strip
+        path = strip(self.delimiter)
+        route = Route(self, path, name, strict=strict)
 
         # TODO"
         # - Add some testing coverage on this
@@ -101,11 +123,13 @@ class BaseRouter(ABC):
             self.name_index[name] = route
 
         for method in methods:
-            route.add_handler(path, handler, method)
+            route.add_handler(path, handler, method, requirements)
 
         return route
 
     def finalize(self, do_compile: bool = True):
+        if self.finalized:
+            raise Exception("already finalized")
         if not len(self.static_routes) + len(self.dynamic_routes):
             # TODO:
             # - Better exception

@@ -55,7 +55,7 @@ router.tree.display()
 print(router.find_route_src)
 print(f"{router.static_routes=}")
 print(f"{router.dynamic_routes=}")
-request = FakeRequest("/foo/2021-01-01", "GET")
+request = FakeRequest("/foo/2021-01-01", "POST")
 route, handler, params = router.get(request)
 request.route = route
 args = (request,)
