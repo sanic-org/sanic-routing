@@ -2,8 +2,9 @@ import uuid
 from datetime import date
 
 import pytest
+
 from sanic_routing import BaseRouter
-from sanic_routing.exceptions import NotFound, RouteExists
+from sanic_routing.exceptions import NoMethod, NotFound, RouteExists
 
 
 @pytest.fixture
@@ -59,18 +60,16 @@ def test_add_duplicate_route_alt_method():
     router.add("/foo/<bar:int>", lambda *args, **kwargs: ...)
 
     assert len(router.static_routes) == 1
-    assert len(router.dynamic_routes) == 1
+    assert len(router.dynamic_routes) == 2
 
     static_handlers = list(
         list(router.static_routes.values())[0].handlers.values()
     )
     assert len(static_handlers[0]) == 2
 
-    dynamic_handlers = list(
-        list(router.dynamic_routes.values())[0].handlers.values()
-    )
-    assert len(dynamic_handlers[0]) == 1
-    assert len(dynamic_handlers[1]) == 1
+    for route in router.dynamic_routes.values():
+        assert len(list(route.handlers.values())) == 1
+        assert len(list(route.handlers.values())) == 1
 
 
 def test_route_does_not_exist():
@@ -87,7 +86,7 @@ def test_method_does_not_exist():
     router.add("/foo", handler)
     router.finalize()
 
-    with pytest.raises(NotFound):
+    with pytest.raises(NoMethod):
         router.get("/foo", "XXXXXXX")
 
 
@@ -117,7 +116,6 @@ def test_cast_types_at_same_position(handler):
         ("int", 11111, int),
         ("number", 99.99, float),
         ("alpha", "ABCxyz", str),
-        ("path", "path/to/file.txt", str),
         ("ymd", "2021-01-01", date),
         ("uuid", uuid.uuid4(), uuid.UUID),
     ),

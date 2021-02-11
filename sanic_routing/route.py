@@ -1,17 +1,16 @@
+import re
 import typing as t
 from collections import defaultdict, namedtuple
 from types import SimpleNamespace
 
-from .exceptions import InvalidUsage, RouteExists
+from .exceptions import ParameterNameConflicts, RouteExists
 from .patterns import REGEX_TYPES
-from .utils import parts_to_path
-
-# from sanic.exceptions import InvalidUsage
-
+from .utils import parts_to_path, path_to_parts
 
 ParamInfo = namedtuple(
-    "ParamInfo", ("name", "raw_path", "label", "cast", "pattern")
+    "ParamInfo", ("name", "raw_path", "label", "cast", "pattern", "regex")
 )
+
 
 class Requirements(dict):
     def __hash__(self):
@@ -20,62 +19,80 @@ class Requirements(dict):
 
 class Route:
     def __init__(
-        self, router, raw_path, name, strict: bool = False
+        self,
+        router,
+        raw_path,
+        name,
+        strict: bool = False,
+        unquote: bool = False,
+        static: bool = False,
+        regex: bool = False,
     ):
         self.router = router
         self.name = name
-        self.handlers = defaultdict(lambda: defaultdict(list))
-        self._params = defaultdict(list)
-        self.raw_paths = set()
+        self.handlers = defaultdict(lambda: defaultdict(list))  # type: ignore
+        self._params: t.Dict[int, ParamInfo] = {}
+        self._raw_path = raw_path
         self.ctx = SimpleNamespace()
 
-        parts = tuple(raw_path.split(self.router.delimiter))
+        parts = path_to_parts(raw_path, self.router.delimiter)
         self.path = parts_to_path(parts, delimiter=self.router.delimiter)
-        self.parts = tuple(self.path.split(self.router.delimiter))
-        self.static = "<" not in self.path
+        self.parts = parts
+        self.static = static
+        self.regex = regex
+        self.pattern = None
         self.strict: bool = strict
-        self.requirements = {}
+        self.unquote: bool = unquote
+        self.requirements: t.Dict[str, t.Any] = {}
 
     def __repr__(self):
         display = (
-            f"[{self.name}]{self.path or '/'}"
+            f"[{self.name}]{self.path or self.router.delimiter}"
             if self.name and self.name != self.path
-            else self.path or "/"
+            else self.path or self.router.delimiter
         )
-        return f"<Route: {display}>"
+        return f"<{self.__class__.__name__}: {display}>"
 
     def get_handler(self, raw_path, method, idx):
         method = method or self.router.DEFAULT_METHOD
         raw_path = raw_path.lstrip(self.router.delimiter)
         try:
             return self.handlers[raw_path][method][idx]
-        except KeyError:
+        except (IndexError, KeyError):
             raise self.router.method_handler_exception(
                 f"Method '{method}' not found on {self}",
                 method=method,
-                allowed_methods=set(self.handlers[raw_path].keys()),
+                allowed_methods=set(self.methods[raw_path]),
             )
 
     def add_handler(self, raw_path, handler, method, requirements):
-        # route_path
+        key_path = parts_to_path(
+            path_to_parts(raw_path, self.router.delimiter),
+            self.router.delimiter,
+        )
+
+        requirements = requirements or {}
         if (
-            method in self.handlers.get(raw_path, {}) and
-            (Requirements(requirements) in self.requirements or not requirements)
+            not self.router.stacking
+            and self.handlers.get(key_path, {}).get(method)
+            and (
+                Requirements(requirements) in self.requirements.values()
+                or not requirements
+            )
         ):
             raise RouteExists(
-                f"Route already registered: {raw_path} [{method}]"
+                f"Route already registered: {key_path} [{method}]"
             )
 
-        idx = len(self.handlers[raw_path][method.upper()])
-        self.handlers[raw_path][method.upper()].append(handler)
-        self.requirements[idx] = requirements
-
-        print(self.requirements)
+        idx = len(self.handlers[key_path][method.upper()])
+        self.handlers[key_path][method.upper()].append(handler)
+        if requirements:
+            self.requirements[idx] = Requirements(requirements)
 
         if not self.static:
-            parts = tuple(raw_path.split(self.router.delimiter))
+            parts = path_to_parts(key_path, self.router.delimiter)
             for idx, part in enumerate(parts):
-                if "<" in part:
+                if "<" in part and len(self.handlers[key_path]) == 1:
                     if ":" in part:
                         (
                             name,
@@ -84,11 +101,11 @@ class Route:
                             pattern,
                         ) = self.parse_parameter_string(part[1:-1])
                         self.add_parameter(
-                            idx, name, raw_path, label, _type, pattern
+                            idx, name, key_path, label, _type, pattern
                         )
                     else:
                         self.add_parameter(
-                            idx, part[1:-1], raw_path, "string", str, None
+                            idx, part[1:-1], key_path, "string", str, None
                         )
 
     def add_parameter(
@@ -100,25 +117,67 @@ class Route:
         cast: t.Type,
         pattern=None,
     ):
-        if label in self._params[idx]:
-            raise RouteExists(f"{self} already has parameter defined at {idx}")
+        if pattern and isinstance(pattern, str):
+            if not pattern.startswith("^"):
+                pattern = f"^{pattern}"
+            if not pattern.endswith("$"):
+                pattern = f"{pattern}$"
 
-        self._params[idx].append(
-            ParamInfo(name, raw_path, label, cast, pattern)
+            pattern = re.compile(pattern)
+
+        self._params[idx] = ParamInfo(
+            name, raw_path, label, cast, pattern, label not in REGEX_TYPES
         )
 
-    def finalize_params(self):
-        self.params = {
-            k: sorted(v, key=self._sorting, reverse=True)
-            for k, v in self._params.items()
-        }
+    def _finalize_params(self):
+        params = dict(self._params)
+        label_pairs = set([(param.name, idx) for idx, param in params.items()])
+        labels = [item[0] for item in label_pairs]
+        if len(labels) != len(set(labels)):
+            raise ParameterNameConflicts(
+                f"Duplicate named parameters in: {self._raw_path}"
+            )
+        self.params = params
+
+    def _finalize_methods(self):
+        self.methods = {}
+        for path, handlers in self.handlers.items():
+            self.methods[path] = set(key.upper() for key in handlers.keys())
+
+    def _finalize_handlers(self):
+        # TODO:
+        # - Make immutable dict
+        self.handlers = dict(self.handlers)
+
+    def _compile_regex(self):
+        components = []
+
+        for part in self.parts:
+            if ":" in part:
+                name, *_, pattern = self.parse_parameter_string(part)
+                if not isinstance(pattern, str):
+                    pattern = pattern.pattern.strip("^$")
+                components.append(f"(?P<{name}>{pattern})")
+            else:
+                components.append(part)
+
+        self.pattern = self.router.delimiter + self.router.delimiter.join(
+            components
+        )
+
+    def finalize(self):
+        self._finalize_params()
+        if self.regex:
+            self._compile_regex()
+        self._finalize_methods()
+        self._finalize_handlers()
 
     @staticmethod
     def _sorting(item) -> int:
         try:
             return list(REGEX_TYPES.keys()).index(item.label)
         except ValueError:
-            raise InvalidUsage(f"Unknown path type: {item.label}")
+            return len(list(REGEX_TYPES.keys()))
 
     @staticmethod
     def parse_parameter_string(parameter_string: str):
@@ -135,6 +194,7 @@ class Route:
             (parameter_name, parameter_type, parameter_pattern)
         """
         # We could receive NAME or NAME:PATTERN
+        parameter_string = parameter_string.strip("<>")
         name = parameter_string
         label = "string"
         if ":" in parameter_string:

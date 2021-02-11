@@ -1,12 +1,17 @@
 import typing as t
 from abc import ABC, abstractmethod
+from datetime import datetime  # noqa
 from itertools import count
+from types import SimpleNamespace
+from urllib.parse import unquote  # noqa
+from uuid import UUID  # noqa
 
 from .exceptions import NoMethod, NotFound
 from .line import Line
+from .patterns import REGEX_TYPES, parse_date  # noqa
 from .route import Route
 from .tree import Tree
-from .utils import parse_parameter_basket
+from .utils import parts_to_path, path_to_parts
 
 TMP = count()
 
@@ -20,15 +25,22 @@ class BaseRouter(ABC):
         delimiter: str = "/",
         exception: t.Type[NotFound] = NotFound,
         method_handler_exception: t.Type[NoMethod] = NoMethod,
+        route_class: t.Type[Route] = Route,
+        stacking: bool = False,
     ) -> None:
+        self._find_route = None
         self.static_routes: t.Dict[t.Tuple[str, ...], Route] = {}
         self.dynamic_routes: t.Dict[t.Tuple[str, ...], Route] = {}
+        self.regex_routes: t.Dict[t.Tuple[str, ...], Route] = {}
         self.name_index: t.Dict[str, Route] = {}
         self.delimiter = delimiter
         self.exception = exception
         self.method_handler_exception = method_handler_exception
+        self.route_class = route_class
         self.tree = Tree()
         self.finalized = False
+        self.stacking = stacking
+        self.ctx = SimpleNamespace()
 
     @abstractmethod
     def get(self):
@@ -40,31 +52,31 @@ class BaseRouter(ABC):
         *,
         method: t.Optional[str] = None,
         orig: t.Optional[str] = None,
-        extra: t.Optional[t.Dict[str,str]] = None,
+        extra: t.Optional[t.Dict[str, str]] = None,
     ):
-        parts = tuple(path[1:].split(self.delimiter))
         try:
-            route, param_basket = self.find_route(parts, self, {"__handler_idx__": 0}, extra)
+            route, param_basket = self.find_route(
+                path, self, {"__handler_idx__": 0, "__params__": {}}, extra
+            )
         except NotFound as e:
             if path.endswith(self.delimiter):
-                return self.resolve(path=path[:-1], method=method, orig=path)
+                return self.resolve(
+                    path=path[:-1],
+                    method=method,
+                    orig=path,
+                    extra=extra,
+                )
             raise self.exception(e, path=path)
-        params = {}
-        handler = None
 
-        if route.static:
-            raw_path = path
-        else:
-            try:
-                params, raw_path = parse_parameter_basket(route, param_basket)
-            except ValueError:
-                raise self.exception
+        handler = None
+        handler_idx = param_basket.pop("__handler_idx__")
+        raw_path = param_basket.pop("__raw_path__")
+        params = param_basket.pop("__params__")
 
         if route.strict and orig and orig[-1] != route.path[-1]:
             raise self.exception("...1", path=path)
 
-
-        handler = route.get_handler(raw_path, method, param_basket["__handler_idx__"])
+        handler = route.get_handler(raw_path, method, handler_idx)
 
         return route, handler, params
 
@@ -76,6 +88,7 @@ class BaseRouter(ABC):
         name: t.Optional[str] = None,
         requirements: t.Optional[t.Dict[str, t.Any]] = None,
         strict: bool = False,
+        unquote: bool = False,  # noqa
     ) -> Route:
         if not methods:
             methods = [self.DEFAULT_METHOD]
@@ -103,11 +116,42 @@ class BaseRouter(ABC):
             raise Exception("finalized")
 
         static = "<" not in path and not requirements
-        routes = self.static_routes if static else self.dynamic_routes
+        regex = self._is_regex(path)
+
+        if regex:
+            routes = self.regex_routes
+        elif static:
+            routes = self.static_routes
+        else:
+            routes = self.dynamic_routes
+
+        # Only URL encode the static parts of the path
+        # path = self.delimiter.join(
+        #     [
+        #         part if part.startswith("<") else quote(part)
+        #         for part in path.split(self.delimiter)
+        #     ]
+        # )
+        path = parts_to_path(
+            path_to_parts(path, self.delimiter), self.delimiter
+        )
 
         strip = path.lstrip if strict else path.strip
         path = strip(self.delimiter)
-        route = Route(self, path, name, strict=strict)
+        route = self.route_class(
+            self,
+            path,
+            name,
+            strict=strict,
+            unquote=unquote,
+            static=static,
+            regex=regex,
+        )
+
+        # Catch the scenario where a route is overload with and
+        # and without requirements
+        if static and route.parts in self.dynamic_routes:
+            routes = self.dynamic_routes
 
         # TODO"
         # - Add some testing coverage on this
@@ -127,15 +171,22 @@ class BaseRouter(ABC):
     def finalize(self, do_compile: bool = True):
         if self.finalized:
             raise Exception("already finalized")
-        if not len(self.static_routes) + len(self.dynamic_routes):
+        if not self.routes:
             # TODO:
             # - Better exception
-            raise Exception("Cannot finalize")
+            raise Exception("Cannot finalize with no routes defined")
         self.finalized = True
+
+        for route in self.routes.values():
+            route.finalize()
+
         self._generate_tree()
         self._render(do_compile)
-        for route in self.dynamic_routes.values():
-            route.finalize_params()
+
+    def reset(self):
+        self.finalized = False
+        self.tree = Tree()
+        self._find_route = None
 
     def _generate_tree(self) -> None:
         self.tree.generate(self.dynamic_routes)
@@ -143,7 +194,9 @@ class BaseRouter(ABC):
 
     def _render(self, do_compile: bool = True) -> None:
         src = [
-            Line("def find_route(parts, router, basket, extra):", 0),
+            Line("def find_route(path, router, basket, extra):", 0),
+            # Line("print(f'{extra=}')", 1),
+            Line("parts = tuple(path[1:].split(router.delimiter))", 1),
         ]
 
         if self.static_routes:
@@ -151,16 +204,20 @@ class BaseRouter(ABC):
             # - future improvement would be to decide which option to use
             #   at runtime based upon the makeup of the router since this
             #   potentially has an impact on performance
-            # src += [
-            #     Line("try:", 1),
-            #     Line("return router.static_routes[path], None", 2),
-            #     Line("except KeyError:", 1),
-            #     Line("pass", 2),
-            # ]
             src += [
-                Line("if parts in router.static_routes:", 1),
-                Line("return router.static_routes[parts], basket", 2),
+                Line("try:", 1),
+                Line("route = router.static_routes[parts]", 2),
+                Line("basket['__raw_path__'] = path", 2),
+                Line("return route, basket", 2),
+                Line("except KeyError:", 1),
+                Line("pass", 2),
             ]
+            # src += [
+            #     Line("if parts in router.static_routes:", 1),
+            #     Line("route = router.static_routes[parts]", 2),
+            #     Line("basket['__raw_path__'] = route.path", 2),
+            #     Line("return route, basket", 2),
+            # ]
             # src += [
             #     Line("if path in router.static_routes:", 1),
             #     Line("return router.static_routes.get(path), None", 2),
@@ -170,6 +227,23 @@ class BaseRouter(ABC):
             # src += [Line("parts = path.split(router.delimiter)", 1)]
             src += [Line("num = len(parts)", 1)]
             src += self.tree.render()
+
+        if self.regex_routes:
+            src += [
+                line
+                for route in self.regex_routes.values()
+                for line in [
+                    Line(f"match = re.match(r'^{route.pattern}$', path)", 1),
+                    Line("if match:", 1),
+                    # Line("basket = {**basket, **match.groupdict()}", 2),
+                    Line("basket['__params__'] = match.groupdict()", 2),
+                    Line(f"basket['__raw_path__'] = '{route.path}'", 2),
+                    Line(
+                        f"return router.name_index['{route.name}'], basket", 2
+                    ),
+                    # Line("return router.regex_routes[parts], basket", 2),
+                ]
+            ]
 
         self.optimize(src)
 
@@ -186,7 +260,19 @@ class BaseRouter(ABC):
                 t.Any, t.Any
             ] = {}  # "REGEX_TYPES": {k: v[1] for k, v in REGEX_TYPES.items()}}
             exec(compiled_src, None, ctx)
-            self.find_route = ctx["find_route"]
+            self._find_route = ctx["find_route"]
+
+    @property
+    def find_route(self):
+        return self._find_route
+
+    @property
+    def routes(self):
+        return {
+            **self.static_routes,
+            **self.dynamic_routes,
+            **self.regex_routes,
+        }
 
     @staticmethod
     def optimize(src: t.List[Line]) -> None:
@@ -230,3 +316,20 @@ class BaseRouter(ABC):
             # - Proper exception message needed
             i = next(TMP)
             src.insert(num, Line(f"raise NotFound('{indent}//{i}')", indent))
+
+    def _is_regex(self, path: str):
+        parts = path_to_parts(path, self.delimiter)
+
+        def requires(part):
+            if not part.startswith("<") or ":" not in part:
+                return False
+
+            _, pattern_type = part[1:-1].split(":")
+
+            return (
+                part.endswith(":path>")
+                or self.delimiter in part
+                or pattern_type not in REGEX_TYPES
+            )
+
+        return any(requires(part) for part in parts)

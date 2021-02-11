@@ -1,4 +1,5 @@
 import pytest
+
 from sanic_routing.tree import Node
 
 

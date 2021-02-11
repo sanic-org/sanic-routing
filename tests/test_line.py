@@ -1,4 +1,5 @@
 import pytest
+
 from sanic_routing.line import Line
 
 

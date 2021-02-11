@@ -26,8 +26,14 @@ class NoMethod(BaseException):
         self.method = method
         self.allowed_methods = allowed_methods
 
+
 class InvalidUsage(BaseException):
     ...
 
+
 class RouteExists(BaseException):
+    ...
+
+
+class ParameterNameConflicts(BaseException):
     ...

@@ -58,18 +58,24 @@ class Node:
         return output
 
     def to_src(self) -> t.Tuple[t.List[Line], t.List[Line]]:
-        indent = (self.level + 1) * 2 - 1
+        indent = (self.level + 1) * 2 - 3
         delayed: t.List[Line] = []
         src: t.List[Line] = []
-        # if self.dynamic:
-        indent -= +2
+
         level = self.level - 1
         equality_check = False
+        return_bump = 1
 
         if self.first or self.root:
             operation = ">"
             use_level = level
-            if self.last and not self.level == 1 and not self.children:
+            if (
+                self.last
+                and self.route
+                and not self.level == 1
+                and not self.children
+                and not self.route.requirements
+            ):
                 use_level = self.level
                 operation = "=="
                 equality_check = True
@@ -83,6 +89,7 @@ class Node:
                 )
                 # This is a control line to help control indentation, but
                 # it should not be rendered
+                # if self.last:
                 src.append(Line("...", 0, offset=-1, render=False))
         else:
             # "if" if (self.parent and self.parent.first)
@@ -99,18 +106,43 @@ class Node:
                     indent + 1,
                 )
             )
+            if self.children:
+                return_bump += 1
 
-        if self.route:
+        if self.route and not self.route.regex:
             location = delayed if self.children else src
             if self.route.requirements:
-                self._inject_requirements(location, indent + 1 + bool(not self.children))
+                self._inject_requirements(
+                    location, indent + return_bump + bool(not self.children)
+                )
+            if self.route.params:
+                self._inject_params(
+                    location, indent + return_bump + bool(not self.children)
+                )
+            param_offset = bool(self.route.params)
+            return_indent = (
+                indent + return_bump + bool(not self.children) + param_offset
+            )
+            location.extend(
+                [
+                    Line(
+                        (f"basket['__raw_path__'] = '{self.route.path}'"),
+                        return_indent,
+                    ),
+                    Line(
+                        (
+                            f"return router.dynamic_routes[{self.route.parts}]"
+                            ", basket"
+                        ),
+                        return_indent,
+                    ),
+                ]
+            )
             location.append(
                 Line(
-                    (
-                        f"return router.dynamic_routes[{self.route.parts}]"
-                        ", basket"
-                    ),
-                    indent + 1 + bool(not self.children),
+                    "...",
+                    indent + return_bump + bool(not self.children),
+                    render=False,
                 )
             )
         return src, delayed
@@ -121,38 +153,43 @@ class Node:
     def _inject_requirements(self, location, indent):
         for idx, reqs in self.route.requirements.items():
             conditional = "if" if idx == 0 else "elif"
-            location.extend([
-
-                Line(
-                    (
-                        f"{conditional} extra == {reqs}:"
-                    ),
-                    indent
-                ),
-                Line(
-                    (
-                        f"basket['__handler_idx__'] = {idx}"
-                    ),
-                    indent + 1
-                )
-            ]
+            location.extend(
+                [
+                    Line((f"{conditional} extra == {reqs}:"), indent),
+                    Line((f"basket['__handler_idx__'] = {idx}"), indent + 1),
+                ]
             )
-        location.extend([
-
-                Line(
-                    (
-                        "else:"
-                    ),
-                    indent
-                ),
-                Line(
-                    (
-                        "raise NotFound('no match reqs')"
-                    ),
-                    indent + 1
-                )
+        location.extend(
+            [
+                Line(("else:"), indent),
+                Line(("raise NotFound(('no match reqs', extra))"), indent + 1),
             ]
+        )
+
+    def _inject_params(self, location, indent):
+        lines = [
+            Line("try:", indent),
+        ]
+        for idx, param in self.route.params.items():
+            unquote_start = "unquote(" if self.route.unquote else ""
+            unquote_end = ")" if self.route.unquote else ""
+            lines.append(
+                Line(
+                    f"basket['__params__']['{param.name}'] = "
+                    f"{unquote_start}{param.cast.__name__}(basket[{idx}])"
+                    f"{unquote_end}",
+                    indent + 1,
+                )
             )
+
+        location.extend(
+            lines
+            + [
+                Line("except ValueError:", indent),
+                Line("...", indent + 1),
+                Line("else:", indent),
+            ]
+        )
 
     @staticmethod
     def _sorting(item) -> t.Tuple[bool, int, str]:
