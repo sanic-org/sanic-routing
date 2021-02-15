@@ -147,6 +147,9 @@ class Route:
     def _finalize_handlers(self):
         self.handlers = Immutable(self.handlers)
 
+    def _reset_handlers(self):
+        self.handlers = dict(self.handlers)
+
     def _compile_regex(self):
         components = []
 
@@ -169,6 +172,9 @@ class Route:
             self._compile_regex()
         self._finalize_methods()
         self._finalize_handlers()
+
+    def reset(self):
+        self._reset_handlers()
 
     @staticmethod
     def _sorting(item) -> int:

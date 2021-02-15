@@ -3,13 +3,7 @@ from abc import ABC, abstractmethod
 from itertools import count
 from types import SimpleNamespace
 
-from .exceptions import (
-    BadMethod,
-    FinalizationError,
-    NoMethod,
-    NotFound,
-    RouteExists,
-)
+from .exceptions import BadMethod, FinalizationError, NoMethod, NotFound
 from .line import Line
 from .patterns import REGEX_TYPES
 from .route import Route
@@ -18,6 +12,7 @@ from .utils import parts_to_path, path_to_parts
 
 # The below functions might be called by the compiled source code, and
 # therefore should be made available here by import
+import re  # noqa  isort:skip
 from datetime import datetime  # noqa  isort:skip
 from urllib.parse import unquote  # noqa  isort:skip
 from uuid import UUID  # noqa  isort:skip
@@ -162,8 +157,6 @@ class BaseRouter(ABC):
             routes[route.parts] = route
 
         if name:
-            if not overwrite and name in self.name_index:
-                raise RouteExists(f"Route named {name} already exists.")
             self.name_index[name] = route
 
         for method in methods:
@@ -188,6 +181,9 @@ class BaseRouter(ABC):
         self.finalized = False
         self.tree = Tree()
         self._find_route = None
+
+        for route in self.routes.values():
+            route.reset()
 
     def _generate_tree(self) -> None:
         self.tree.generate(self.dynamic_routes)
