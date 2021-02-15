@@ -28,11 +28,11 @@ with open_local(["README.md"]) as rm:
 setup_kwargs = {
     "name": "sanic-routing",
     "version": version,
-    "url": "https://github.com/huge-success/sanic-routing/",
+    "url": "https://github.com/sanic-org/sanic-routing/",
     "license": "MIT",
     "author": "Adam Hopkins",
     "author_email": "admhpkns@gmail.com",
-    "description": ("Core routing clients for Sanic"),
+    "description": ("Core routing component for Sanic"),
     "long_description": long_description,
     "long_description_content_type": "text/markdown",
     "packages": ["sanic_routing"],
