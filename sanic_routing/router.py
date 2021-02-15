@@ -1,17 +1,21 @@
 import typing as t
 from abc import ABC, abstractmethod
-from datetime import datetime  # noqa
 from itertools import count
 from types import SimpleNamespace
-from urllib.parse import unquote  # noqa
-from uuid import UUID  # noqa
 
-from .exceptions import NoMethod, NotFound
+from .exceptions import BadMethod, FinalizationError, NoMethod, NotFound
 from .line import Line
-from .patterns import REGEX_TYPES, parse_date  # noqa
+from .patterns import REGEX_TYPES
 from .route import Route
 from .tree import Tree
 from .utils import parts_to_path, path_to_parts
+
+# The below functions might be called by the compiled source code, and
+# therefore should be made available here by import
+from datetime import datetime  # noqa  isort:skip
+from urllib.parse import unquote  # noqa  isort:skip
+from uuid import UUID  # noqa  isort:skip
+from .patterns import parse_date  # noqa  isort:skip
 
 TMP = count()
 
@@ -74,7 +78,7 @@ class BaseRouter(ABC):
         params = param_basket.pop("__params__")
 
         if route.strict and orig and orig[-1] != route.path[-1]:
-            raise self.exception("...1", path=path)
+            raise self.exception("Path not found", path=path)
 
         handler = route.get_handler(raw_path, method, handler_idx)
 
@@ -101,19 +105,17 @@ class BaseRouter(ABC):
         if self.ALLOWED_METHODS and any(
             method not in self.ALLOWED_METHODS for method in methods
         ):
-            # TODO:
-            # - Better exception
             bad = [
                 method
                 for method in methods
                 if method not in self.ALLOWED_METHODS
             ]
-            raise Exception(f"bad method: {bad}")
+            raise BadMethod(
+                f"Bad method: {bad}. Must be one of: {self.ALLOWED_METHODS}"
+            )
 
         if self.finalized:
-            # TODO:
-            # - Better exception
-            raise Exception("finalized")
+            raise FinalizationError("Cannot finalize router more than once.")
 
         static = "<" not in path and not requirements
         regex = self._is_regex(path)
@@ -126,12 +128,6 @@ class BaseRouter(ABC):
             routes = self.dynamic_routes
 
         # Only URL encode the static parts of the path
-        # path = self.delimiter.join(
-        #     [
-        #         part if part.startswith("<") else quote(part)
-        #         for part in path.split(self.delimiter)
-        #     ]
-        # )
         path = parts_to_path(
             path_to_parts(path, self.delimiter), self.delimiter
         )
@@ -148,13 +144,11 @@ class BaseRouter(ABC):
             regex=regex,
         )
 
-        # Catch the scenario where a route is overload with and
+        # Catch the scenario where a route is overloaded with and
         # and without requirements
         if static and route.parts in self.dynamic_routes:
             routes = self.dynamic_routes
 
-        # TODO"
-        # - Add some testing coverage on this
         if route.parts in routes:
             route = routes[route.parts]
         else:
@@ -195,7 +189,6 @@ class BaseRouter(ABC):
     def _render(self, do_compile: bool = True) -> None:
         src = [
             Line("def find_route(path, router, basket, extra):", 0),
-            # Line("print(f'{extra=}')", 1),
             Line("parts = tuple(path[1:].split(router.delimiter))", 1),
         ]
 
@@ -220,11 +213,12 @@ class BaseRouter(ABC):
             # ]
             # src += [
             #     Line("if path in router.static_routes:", 1),
-            #     Line("return router.static_routes.get(path), None", 2),
+            #     Line("route = router.static_routes.get(path)", 2),
+            #     Line("basket['__raw_path__'] = route.path", 2),
+            #     Line("return route, basket", 2),
             # ]
 
         if self.dynamic_routes:
-            # src += [Line("parts = path.split(router.delimiter)", 1)]
             src += [Line("num = len(parts)", 1)]
             src += self.tree.render()
 
@@ -235,13 +229,11 @@ class BaseRouter(ABC):
                 for line in [
                     Line(f"match = re.match(r'^{route.pattern}$', path)", 1),
                     Line("if match:", 1),
-                    # Line("basket = {**basket, **match.groupdict()}", 2),
                     Line("basket['__params__'] = match.groupdict()", 2),
                     Line(f"basket['__raw_path__'] = '{route.path}'", 2),
                     Line(
                         f"return router.name_index['{route.name}'], basket", 2
                     ),
-                    # Line("return router.regex_routes[parts], basket", 2),
                 ]
             ]
 
@@ -256,9 +248,7 @@ class BaseRouter(ABC):
                 "",
                 "exec",
             )
-            ctx: t.Dict[
-                t.Any, t.Any
-            ] = {}  # "REGEX_TYPES": {k: v[1] for k, v in REGEX_TYPES.items()}}
+            ctx: t.Dict[t.Any, t.Any] = {}
             exec(compiled_src, None, ctx)
             self._find_route = ctx["find_route"]
 
@@ -312,10 +302,9 @@ class BaseRouter(ABC):
             idnt += 1
 
         for num, indent in sorted(insert_at, key=lambda x: (x[0] * -1, x[1])):
-            # TODO:
-            # - Proper exception message needed
-            i = next(TMP)
-            src.insert(num, Line(f"raise NotFound('{indent}//{i}')", indent))
+
+            next(TMP)
+            src.insert(num, Line("raise NotFound", indent))
 
     def _is_regex(self, path: str):
         parts = path_to_parts(path, self.delimiter)

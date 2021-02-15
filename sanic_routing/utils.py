@@ -4,13 +4,19 @@ from urllib.parse import quote, unquote
 from .patterns import REGEX_PARAM_NAME
 
 
+class Immutable(dict):
+    def __setitem__(self, *args):
+        raise TypeError("Cannot change immutable dict")
+
+    def __delitem__(self, *args):
+        raise TypeError("Cannot change immutable dict")
+
+
 def parse_parameter_basket(route, basket, raw_path=None):
     params = {}
     if basket:
         for idx, value in basket.items():
             for p in route.params[idx]:
-                # print(params, raw_path)
-                # print(f"[{idx}] >> {p} for {value=}")
                 if not raw_path or p.raw_path == raw_path:
                     if not p.regex:
                         raw_path = p.raw_path
@@ -22,10 +28,10 @@ def parse_parameter_basket(route, basket, raw_path=None):
                         break
 
                     if raw_path:
-                        raise ValueError("1...")
+                        raise ValueError("Invalid parameter")
 
                 if raw_path and not params[p.name]:
-                    raise ValueError("2...")
+                    raise ValueError("Invalid parameter")
 
             if route.unquote:
                 for p in route.params[idx]:
@@ -33,7 +39,7 @@ def parse_parameter_basket(route, basket, raw_path=None):
                         params[p.name] = unquote(params[p.name])
 
     if raw_path is None:
-        raise ValueError("3...")
+        raise ValueError("Invalid parameter")
     return params, raw_path
 
 

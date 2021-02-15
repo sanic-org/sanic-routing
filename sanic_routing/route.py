@@ -5,7 +5,7 @@ from types import SimpleNamespace
 
 from .exceptions import ParameterNameConflicts, RouteExists
 from .patterns import REGEX_TYPES
-from .utils import parts_to_path, path_to_parts
+from .utils import Immutable, parts_to_path, path_to_parts
 
 ParamInfo = namedtuple(
     "ParamInfo", ("name", "raw_path", "label", "cast", "pattern", "regex")
@@ -21,8 +21,8 @@ class Route:
     def __init__(
         self,
         router,
-        raw_path,
-        name,
+        raw_path: str,
+        name: str,
         strict: bool = False,
         unquote: bool = False,
         static: bool = False,
@@ -47,9 +47,9 @@ class Route:
 
     def __repr__(self):
         display = (
-            f"[{self.name}]{self.path or self.router.delimiter}"
+            f"name={self.name} path={self.path or self.router.delimiter}"
             if self.name and self.name != self.path
-            else self.path or self.router.delimiter
+            else f"path={self.path or self.router.delimiter}"
         )
         return f"<{self.__class__.__name__}: {display}>"
 
@@ -145,9 +145,7 @@ class Route:
             self.methods[path] = set(key.upper() for key in handlers.keys())
 
     def _finalize_handlers(self):
-        # TODO:
-        # - Make immutable dict
-        self.handlers = dict(self.handlers)
+        self.handlers = Immutable(self.handlers)
 
     def _compile_regex(self):
         components = []

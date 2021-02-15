@@ -1,7 +1,11 @@
 import typing as t
+from logging import getLogger
 
 from .line import Line
+from .patterns import REGEX_PARAM_NAME
 from .route import Route
+
+logger = getLogger("sanic.root")
 
 
 class Node:
@@ -26,7 +30,7 @@ class Node:
             for prop in ["part", "level", "route", "dynamic"]
             if getattr(self, prop) or prop in ["level"]
         )
-        return f"Node({internals})"
+        return f"<Node: {internals}>"
 
     def finalize_children(self):
         self.children = {
@@ -41,8 +45,10 @@ class Node:
                 child.finalize_children()
 
     def display(self) -> None:
-        """This is TEMP"""
-        print(" " * 4 * self.level, self)
+        """
+        Visual display of the tree of nodes
+        """
+        logger.info(" " * 4 * self.level + str(self))
         for child in self.children.values():
             child.display()
 
@@ -89,11 +95,8 @@ class Node:
                 )
                 # This is a control line to help control indentation, but
                 # it should not be rendered
-                # if self.last:
                 src.append(Line("...", 0, offset=-1, render=False))
         else:
-            # "if" if (self.parent and self.parent.first)
-            # or self.root else "elif"
             if_stmt = "if" if self.first or self.root else "elif"
             len_check = (
                 f" and num == {self.level}"
@@ -138,6 +141,8 @@ class Node:
                     ),
                 ]
             )
+            # This is a control line to help control indentation, but
+            # it should not be rendered
             location.append(
                 Line(
                     "...",
@@ -162,7 +167,7 @@ class Node:
         location.extend(
             [
                 Line(("else:"), indent),
-                Line(("raise NotFound(('no match reqs', extra))"), indent + 1),
+                Line(("raise NotFound"), indent + 1),
             ]
         )
 
@@ -211,13 +216,16 @@ class Tree:
                 current = current._children[part]
                 current.level = level + 1
 
-                # TODO:
-                # - full evaluation to make sure that the part if it is dynamic
-                #   is compliant and can be parsed by one of the known types
                 current.dynamic = part.startswith("<")
+                if current.dynamic and not REGEX_PARAM_NAME.match(part):
+                    raise ValueError(f"Invalid declaration: {part}")
+
             current.route = route
 
     def display(self) -> None:
+        """
+        Debug tool to output visual of the tree
+        """
         self.root.display()
 
     def render(self) -> t.List[Line]:
