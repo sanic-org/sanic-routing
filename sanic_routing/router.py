@@ -3,7 +3,13 @@ from abc import ABC, abstractmethod
 from itertools import count
 from types import SimpleNamespace
 
-from .exceptions import BadMethod, FinalizationError, NoMethod, NotFound
+from .exceptions import (
+    BadMethod,
+    FinalizationError,
+    NoMethod,
+    NotFound,
+    RouteExists,
+)
 from .line import Line
 from .patterns import REGEX_TYPES
 from .route import Route
@@ -93,6 +99,7 @@ class BaseRouter(ABC):
         requirements: t.Optional[t.Dict[str, t.Any]] = None,
         strict: bool = False,
         unquote: bool = False,  # noqa
+        overwrite: bool = False,
     ) -> Route:
         if not methods:
             methods = [self.DEFAULT_METHOD]
@@ -155,6 +162,8 @@ class BaseRouter(ABC):
             routes[route.parts] = route
 
         if name:
+            if not overwrite and name in self.name_index:
+                raise RouteExists(f"Route named {name} already exists.")
             self.name_index[name] = route
 
         for method in methods:
@@ -164,11 +173,9 @@ class BaseRouter(ABC):
 
     def finalize(self, do_compile: bool = True):
         if self.finalized:
-            raise Exception("already finalized")
+            raise FinalizationError("Cannot finalize router more than once.")
         if not self.routes:
-            # TODO:
-            # - Better exception
-            raise Exception("Cannot finalize with no routes defined")
+            raise FinalizationError("Cannot finalize with no routes defined.")
         self.finalized = True
 
         for route in self.routes.values():
