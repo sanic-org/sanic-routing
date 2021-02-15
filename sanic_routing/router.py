@@ -70,7 +70,7 @@ class BaseRouter(ABC):
                     orig=path,
                     extra=extra,
                 )
-            raise self.exception(e, path=path)
+            raise self.exception(str(e), path=path)
 
         handler = None
         handler_idx = param_basket.pop("__handler_idx__")
@@ -137,7 +137,7 @@ class BaseRouter(ABC):
         route = self.route_class(
             self,
             path,
-            name,
+            name or "",
             strict=strict,
             unquote=unquote,
             static=static,
