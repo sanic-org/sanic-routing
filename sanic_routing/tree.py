@@ -78,7 +78,7 @@ class Node:
             if (
                 self.last
                 and self.route
-                and not self.level == 1
+                # and not self.level == 1
                 and not self.children
                 and not self.route.requirements
             ):

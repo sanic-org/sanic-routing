@@ -48,6 +48,7 @@ def parse_parameter_basket(route, basket, raw_path=None):
 
 def path_to_parts(path, delimiter="/"):
     """
+    OK > /foo/<id:int>/bar/<name:[A-z]+>
     OK > /foo/<unhashable:[A-Za-z0-9/]+>
     OK > /foo/<ext:file\.(?P<ext>txt)>/<ext:[a-z]>  # noqa
     OK > /foo/<user>/<user:str>
@@ -55,7 +56,7 @@ def path_to_parts(path, delimiter="/"):
     NOT OK > /foo/<ext:file\.(?P<ext>txt)d>/<ext:[a-z]>  # noqa
     """
     regex_path_parts = re.compile(
-        f"(<.*?(?<![a-z])>|<[a-z\:]+>|[^{delimiter}]+)"  # noqa
+        f"(<[a-z\:]+?>|<.*?(?<![a-z])>|[^{delimiter}]+)"  # noqa
     )
     parts = list(regex_path_parts.findall(unquote(path))) or [""]
     if path.endswith(delimiter):
