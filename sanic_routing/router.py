@@ -226,6 +226,9 @@ class BaseRouter(ABC):
             src += self.tree.render()
 
         if self.regex_routes:
+            # TODO:
+            # - we should probably pre-compile the patterns and only
+            #   include them here by reference
             src += [
                 line
                 for route in self.regex_routes.values()
@@ -316,7 +319,7 @@ class BaseRouter(ABC):
             if not part.startswith("<") or ":" not in part:
                 return False
 
-            _, pattern_type = part[1:-1].split(":")
+            _, pattern_type = part[1:-1].split(":", 1)
 
             return (
                 part.endswith(":path>")

@@ -3,7 +3,7 @@ import typing as t
 from collections import defaultdict, namedtuple
 from types import SimpleNamespace
 
-from .exceptions import ParameterNameConflicts, RouteExists
+from .exceptions import InvalidUsage, ParameterNameConflicts, RouteExists
 from .patterns import REGEX_TYPES
 from .utils import Immutable, parts_to_path, path_to_parts
 
@@ -44,6 +44,7 @@ class Route:
         self.strict: bool = strict
         self.unquote: bool = unquote
         self.requirements: t.Dict[str, t.Any] = {}
+        self.labels: t.Optional[t.List[str]] = None
 
     def __repr__(self):
         display = (
@@ -137,6 +138,7 @@ class Route:
             raise ParameterNameConflicts(
                 f"Duplicate named parameters in: {self._raw_path}"
             )
+        self.labels = labels
         self.params = params
 
     def _finalize_methods(self):
@@ -158,7 +160,28 @@ class Route:
                 name, *_, pattern = self.parse_parameter_string(part)
                 if not isinstance(pattern, str):
                     pattern = pattern.pattern.strip("^$")
-                components.append(f"(?P<{name}>{pattern})")
+                compiled = re.compile(pattern)
+                if compiled.groups == 1:
+                    if compiled.groupindex:
+                        if list(compiled.groupindex)[0] != name:
+                            raise InvalidUsage(
+                                f"Named group ({list(compiled.groupindex)[0]})"
+                                f" must match your named parameter ({name})"
+                            )
+                        components.append(pattern)
+                    else:
+                        if pattern.count("(") > 1:
+                            raise InvalidUsage(
+                                f"Could not compile pattern {pattern}. "
+                                "Try using a named group instead: "
+                                f"'(?P<{name}>your_matching_group)'"
+                            )
+                        beginning, end = pattern.split("(")
+                        components.append(f"{beginning}(?P<{name}>{end}")
+                elif compiled.groups > 1:
+                    raise InvalidUsage(f"Invalid matching pattern {pattern}")
+                else:
+                    components.append(f"(?P<{name}>{pattern})")
             else:
                 components.append(part)
 
@@ -175,6 +198,10 @@ class Route:
 
     def reset(self):
         self._reset_handlers()
+
+    @property
+    def raw_path(self):
+        return self._raw_path
 
     @staticmethod
     def _sorting(item) -> int:
