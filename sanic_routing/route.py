@@ -18,6 +18,26 @@ class Requirements(dict):
 
 
 class Route:
+    __slots__ = (
+        "_params",
+        "_raw_path",
+        "ctx",
+        "handlers",
+        "labels",
+        "methods",
+        "name",
+        "params",
+        "parts",
+        "path",
+        "pattern",
+        "regex",
+        "requirements",
+        "router",
+        "static",
+        "strict",
+        "unquote",
+    )
+
     def __init__(
         self,
         router,
