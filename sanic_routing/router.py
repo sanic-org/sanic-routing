@@ -48,7 +48,7 @@ class BaseRouter(ABC):
         self.ctx = SimpleNamespace()
 
     @abstractmethod
-    def get(self):
+    def get(self, **kwargs):
         ...
 
     def resolve(
