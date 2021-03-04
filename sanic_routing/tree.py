@@ -156,8 +156,8 @@ class Node:
         self._children[child.part] = child
 
     def _inject_requirements(self, location, indent):
-        for idx, reqs in self.route.requirements.items():
-            conditional = "if" if idx == 0 else "elif"
+        for k, (idx, reqs) in enumerate(self.route.requirements.items()):
+            conditional = "if" if k == 0 else "elif"
             location.extend(
                 [
                     Line((f"{conditional} extra == {reqs}:"), indent),
