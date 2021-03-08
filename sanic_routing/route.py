@@ -36,6 +36,7 @@ class Route:
         "static",
         "strict",
         "unquote",
+        "overloaded",
     )
 
     def __init__(
@@ -47,6 +48,7 @@ class Route:
         unquote: bool = False,
         static: bool = False,
         regex: bool = False,
+        overloaded: bool = False,
     ):
         self.router = router
         self.name = name
@@ -60,10 +62,11 @@ class Route:
         self.parts = parts
         self.static = static
         self.regex = regex
+        self.overloaded = overloaded
         self.pattern = None
         self.strict: bool = strict
         self.unquote: bool = unquote
-        self.requirements: t.Dict[str, t.Any] = {}
+        self.requirements: t.Dict[int, t.Any] = {}
         self.labels: t.Optional[t.List[str]] = None
 
     def __repr__(self):
@@ -86,20 +89,27 @@ class Route:
                 allowed_methods=self.methods,
             )
 
-    def add_handler(self, raw_path, handler, method, requirements):
+    def add_handler(
+        self,
+        raw_path,
+        handler,
+        method,
+        requirements,
+        overwrite: bool = False,
+    ):
         key_path = parts_to_path(
             path_to_parts(raw_path, self.router.delimiter),
             self.router.delimiter,
         )
 
-        requirements = requirements or {}
         if (
             not self.router.stacking
             and self.handlers.get(key_path, {}).get(method)
             and (
-                Requirements(requirements) in self.requirements.values()
-                or not requirements
+                requirements is None
+                or Requirements(requirements) in self.requirements.values()
             )
+            and not overwrite
         ):
             raise RouteExists(
                 f"Route already registered: {key_path} [{method}]"
@@ -107,7 +117,7 @@ class Route:
 
         idx = len(self.handlers[key_path][method.upper()])
         self.handlers[key_path][method.upper()].append(handler)
-        if requirements:
+        if requirements is not None:
             self.requirements[idx] = Requirements(requirements)
 
         if not self.static:
