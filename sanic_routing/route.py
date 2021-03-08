@@ -86,7 +86,7 @@ class Route:
             raise self.router.method_handler_exception(
                 f"Method '{method}' not found on {self}",
                 method=method,
-                allowed_methods=set(self.methods[raw_path]),
+                allowed_methods=self.methods,
             )
 
     def add_handler(
@@ -172,9 +172,9 @@ class Route:
         self.params = params
 
     def _finalize_methods(self):
-        self.methods = {}
-        for path, handlers in self.handlers.items():
-            self.methods[path] = set(key.upper() for key in handlers.keys())
+        self.methods = set()
+        for handlers in self.handlers.values():
+            self.methods.update(set(key.upper() for key in handlers.keys()))
 
     def _finalize_handlers(self):
         self.handlers = Immutable(self.handlers)
