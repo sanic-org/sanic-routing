@@ -66,7 +66,7 @@ class Route:
         self.pattern = None
         self.strict: bool = strict
         self.unquote: bool = unquote
-        self.requirements: t.Dict[str, t.Any] = {}
+        self.requirements: t.Dict[int, t.Any] = {}
         self.labels: t.Optional[t.List[str]] = None
 
     def __repr__(self):

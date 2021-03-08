@@ -3,13 +3,7 @@ from abc import ABC, abstractmethod
 from itertools import count
 from types import SimpleNamespace
 
-from .exceptions import (
-    BadMethod,
-    FinalizationError,
-    NoMethod,
-    NotFound,
-    RouteExists,
-)
+from .exceptions import BadMethod, FinalizationError, NoMethod, NotFound
 from .line import Line
 from .patterns import REGEX_TYPES
 from .route import Route
