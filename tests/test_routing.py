@@ -46,10 +46,12 @@ def test_add_duplicate_route_fails():
     router.add("/foo/bar", lambda *args, **kwargs: ...)
     with pytest.raises(RouteExists):
         router.add("/foo/bar", lambda *args, **kwargs: ...)
+    router.add("/foo/bar", lambda *args, **kwargs: ..., overwrite=True)
 
     router.add("/foo/<bar>", lambda *args, **kwargs: ...)
     with pytest.raises(RouteExists):
         router.add("/foo/<bar>", lambda *args, **kwargs: ...)
+    router.add("/foo/<bar>", lambda *args, **kwargs: ..., overwrite=True)
 
 
 def test_add_duplicate_route_alt_method():

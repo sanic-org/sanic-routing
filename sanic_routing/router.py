@@ -3,7 +3,13 @@ from abc import ABC, abstractmethod
 from itertools import count
 from types import SimpleNamespace
 
-from .exceptions import BadMethod, FinalizationError, NoMethod, NotFound
+from .exceptions import (
+    BadMethod,
+    FinalizationError,
+    NoMethod,
+    NotFound,
+    RouteExists,
+)
 from .line import Line
 from .patterns import REGEX_TYPES
 from .route import Route
@@ -119,7 +125,7 @@ class BaseRouter(ABC):
         if self.finalized:
             raise FinalizationError("Cannot finalize router more than once.")
 
-        static = "<" not in path and not requirements
+        static = "<" not in path and requirements is None
         regex = self._is_regex(path)
 
         if regex:
@@ -147,20 +153,27 @@ class BaseRouter(ABC):
         )
 
         # Catch the scenario where a route is overloaded with and
-        # and without requirements
+        # and without requirements, first as dynamic then as static
         if static and route.parts in self.dynamic_routes:
             routes = self.dynamic_routes
 
-        if route.parts in routes:
-            route = routes[route.parts]
+        # Catch the reverse scenario where a route is overload first as static
+        # and then as dynamic
+        if not static and route.parts in self.static_routes:
+            route = self.static_routes.pop(route.parts)
+            self.dynamic_routes[route.parts] = route
+
         else:
-            routes[route.parts] = route
+            if route.parts in routes:
+                route = routes[route.parts]
+            else:
+                routes[route.parts] = route
 
         if name:
             self.name_index[name] = route
 
         for method in methods:
-            route.add_handler(path, handler, method, requirements)
+            route.add_handler(path, handler, method, requirements, overwrite)
 
         return route
 
