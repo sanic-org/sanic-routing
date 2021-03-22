@@ -145,7 +145,7 @@ def test_conditional_check_proper_compile(handler):
 @pytest.mark.parametrize(
     "param_name",
     (
-        "fooBar", "foo_bar",
+        "fooBar", "foo_bar", "Foobar", "foobar1",
     ),
 )
 def test_use_param_name(handler, param_name):
@@ -159,7 +159,7 @@ def test_use_param_name(handler, param_name):
 @pytest.mark.parametrize(
     "param_name",
     (
-        "fooBar", "foo_bar",
+        "fooBar", "foo_bar", "Foobar", "foobar1",
     ),
 )
 def test_use_param_name_with_casing(handler, param_name):
