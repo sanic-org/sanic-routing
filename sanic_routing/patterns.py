@@ -7,7 +7,7 @@ def parse_date(d):
     return datetime.strptime(d, "%Y-%m-%d").date()
 
 
-REGEX_PARAM_NAME = re.compile(r"^<([a-z_]+)(?::(.*))?>$")
+REGEX_PARAM_NAME = re.compile(r"^<([a-zA-Z_]+)(?::(.*))?>$")
 REGEX_TYPES = {
     "string": (str, re.compile(r"^[^/]+")),
     "int": (int, re.compile(r"^-?\d+")),

@@ -140,3 +140,31 @@ def test_conditional_check_proper_compile(handler):
     router.finalize()
 
     assert router.finalized
+
+
+@pytest.mark.parametrize(
+    "param_name",
+    (
+        "fooBar", "foo_bar",
+    ),
+)
+def test_use_param_name(handler, param_name):
+    router = Router()
+    path_part_with_param = f"<{param_name}>"
+    router.add( f"/path/{path_part_with_param}", handler)
+    route = list(router.routes)[0]
+    assert ("path", path_part_with_param) == route
+
+
+@pytest.mark.parametrize(
+    "param_name",
+    (
+        "fooBar", "foo_bar",
+    ),
+)
+def test_use_param_name_with_casing(handler, param_name):
+    router = Router()
+    path_part_with_param = f"<{param_name}:str>"
+    router.add( f"/path/{path_part_with_param}", handler)
+    route = list(router.routes)[0]
+    assert ("path", path_part_with_param) == route
