@@ -289,7 +289,10 @@ class BaseRouter(ABC):
         for num, line in enumerate(src):
             if line.indent < current:
                 if not line.src.startswith("."):
-                    offset = 0
+                    if offset < 0:
+                        offset += 1
+                    else:
+                        offset = 0
 
             if (
                 line.src.startswith("if")

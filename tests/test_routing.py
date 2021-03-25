@@ -168,3 +168,40 @@ def test_use_param_name_with_casing(handler, param_name):
     router.add( f"/path/{path_part_with_param}", handler)
     route = list(router.routes)[0]
     assert ("path", path_part_with_param) == route
+
+def test_use_route_contains_children(handler):
+    router = Router()
+    router.add("/foo/<foo_id>/bars_ids", handler)
+    router.add("/foo/<foo_id>/bars_ids/<bar_id>/settings/<group_id>/groups", handler)
+
+    router.finalize()
+
+    bars_ids = router.get("/foo/123/bars_ids", "BASE")
+    bars_ids_groups = router.get("/foo/123/bars_ids/321/settings/111/groups", "BASE")
+
+    bars_ids_retval = bars_ids[1](**bars_ids[2])
+    assert isinstance(bars_ids_retval, str)
+    assert bars_ids_retval == "123"
+
+    bars_ids_group_dict = bars_ids_groups[2]
+    assert bars_ids_group_dict == {'foo_id':'123', 'bar_id': '321', 'group_id': '111'}
+
+
+def test_use_route_with_different_depth(handler):
+    router = Router()
+    router.add("/foo/<foo_id>", handler)
+    router.add("/foo/<foo_id>/settings", handler)
+    router.add("/foo/<foo_id>/bars/<bar_id>/settings", handler)
+    router.add("/foo/<foo_id>/bars_ids", handler)
+    router.add("/foo/<foo_id>/bars_ids/<bar_id>/settings", handler)
+    router.add("/foo/<foo_id>/bars_ids/<bar_id>/settings/<group_id>/groups", handler)
+
+    router.finalize()
+
+    router.get("/foo/123", "BASE")
+    router.get("/foo/123/settings", "BASE")
+    router.get("/foo/123/bars/321/settings", "BASE")
+    router.get("/foo/123/bars_ids", "BASE")
+    router.get("/foo/123/bars_ids/321/settings", "BASE")
+    router.get("/foo/123/bars_ids/321/settings/111/groups", "BASE")
+
