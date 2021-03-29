@@ -73,8 +73,10 @@ class Node:
         return_bump = 1
 
         if self.first or self.root:
+            src = []
             operation = ">"
             use_level = level
+            conditional = "if"
             if (
                 self.last
                 and self.route
@@ -85,7 +87,16 @@ class Node:
                 use_level = self.level
                 operation = "=="
                 equality_check = True
-            src = [Line(f"if num {operation} {use_level}:", indent)]
+                conditional = "elif"
+                src.extend(
+                    [
+                        Line(f"if num > {use_level}:", indent),
+                        Line("raise NotFound", indent + 1),
+                    ]
+                )
+            src.append(
+                Line(f"{conditional} num {operation} {use_level}:", indent)
+            )
 
         if self.dynamic:
             if not self.parent.children_basketed:

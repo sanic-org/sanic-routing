@@ -299,6 +299,7 @@ class BaseRouter(ABC):
                 or line.src.startswith("elif")
                 or line.src.startswith("return")
                 or line.src.startswith("basket")
+                or line.src.startswith("try")
             ):
 
                 idnt = line.indent + 1
