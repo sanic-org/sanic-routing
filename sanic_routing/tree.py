@@ -18,6 +18,7 @@ class Node:
         self._children: t.Dict[str, "Node"] = {}
         self.children: t.Dict[str, "Node"] = {}
         self.level = 0
+        self.offset = 0
         self.route: t.Optional[Route] = None
         self.dynamic = False
         self.first = False
@@ -63,8 +64,15 @@ class Node:
         output += delayed
         return output
 
+    def apply_offset(self, amt, apply_self=True, apply_children=False):
+        if apply_self:
+            self.offset += amt
+        if apply_children:
+            for child in self.children.values():
+                child.apply_offset(amt, apply_children=True)
+
     def to_src(self) -> t.Tuple[t.List[Line], t.List[Line]]:
-        indent = (self.level + 1) * 2 - 3
+        indent = (self.level + 1) * 2 - 3 + self.offset
         delayed: t.List[Line] = []
         src: t.List[Line] = []
 
@@ -80,7 +88,6 @@ class Node:
             if (
                 self.last
                 and self.route
-                # and not self.level == 1
                 and not self.children
                 and not self.route.requirements
             ):
@@ -104,9 +111,10 @@ class Node:
                 src.append(
                     Line(f"basket[{level}] = parts[{level}]", indent + 1)
                 )
-                # This is a control line to help control indentation, but
-                # it should not be rendered
-                src.append(Line("...", 0, offset=-1, render=False))
+                self.parent.apply_offset(-1, False, True)
+
+                if not self.children:
+                    return_bump -= 1
         else:
             if_stmt = "if" if self.first or self.root else "elif"
             len_check = (
@@ -114,6 +122,8 @@ class Node:
                 if not self.children and not equality_check
                 else ""
             )
+            if if_stmt == "elif":
+                src.append(Line("...", 0, offset=0, render=False))
             src.append(
                 Line(
                     f'{if_stmt} parts[{level}] == "{self.part}"{len_check}:',
@@ -202,7 +212,7 @@ class Node:
             lines
             + [
                 Line("except ValueError:", indent),
-                Line("...", indent + 1),
+                Line("pass", indent + 1),
                 Line("else:", indent),
             ]
         )

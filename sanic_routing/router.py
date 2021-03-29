@@ -301,7 +301,6 @@ class BaseRouter(ABC):
                 or line.src.startswith("basket")
                 or line.src.startswith("try")
             ):
-
                 idnt = line.indent + 1
                 prev_line = src[num - 1]
                 while idnt < prev_line.indent:

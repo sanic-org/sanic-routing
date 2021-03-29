@@ -222,7 +222,7 @@ def test_use_route_with_different_depth(handler):
     router.get("/foo/123/bars_ids/321/settings/111/groups", "BASE")
 
 
-def test_use_route_type_coersion(handler):
+def test_use_route_type_coercion(handler):
     router = Router()
     router.add("/test/<foo:int>", handler)
     router.add("/test/<foo:int>/bar", handler)
@@ -238,3 +238,31 @@ def test_use_route_type_coersion(handler):
         router.get("/test/123/aaaa", "BASE")
     with pytest.raises(NotFound):
         router.get("/test/123/aaaa/bbbb", "BASE")
+
+
+def test_use_route_type_coercion_deeper(handler):
+    router = Router()
+    router.add("/test/<foo:int>", handler)
+    router.add("/test/<foo:int>/bar", handler)
+    router.add("/test/<foo:int>/bar/baz", handler)
+
+    router.finalize()
+
+    router.get("/test/123", "BASE")
+    router.get("/test/123/bar", "BASE")
+    router.get("/test/123/bar/baz", "BASE")
+
+    with pytest.raises(NotFound):
+        router.get("/test/foo/aaaa", "BASE")
+    with pytest.raises(NotFound):
+        router.get("/test/123/aaaa", "BASE")
+    with pytest.raises(NotFound):
+        router.get("/test/123/aaaa/bbbb", "BASE")
+    with pytest.raises(NotFound):
+        router.get("/test/123/aaaa/bbbb/cccc", "BASE")
+    with pytest.raises(NotFound):
+        router.get("/test/foo/bar", "BASE")
+    with pytest.raises(NotFound):
+        router.get("/test/123/bar/bbbb", "BASE")
+    with pytest.raises(NotFound):
+        router.get("/test/123/bar/bbbb/cccc", "BASE")
