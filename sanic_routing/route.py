@@ -169,7 +169,9 @@ class Route:
                 f"Duplicate named parameters in: {self._raw_path}"
             )
         self.labels = labels
-        self.params = params
+        self.params = dict(
+            sorted(params.items(), key=lambda param: self._sorting(param[1]))
+        )
 
     def _finalize_methods(self):
         self.methods = set()

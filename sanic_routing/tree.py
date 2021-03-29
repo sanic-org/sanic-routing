@@ -2,7 +2,7 @@ import typing as t
 from logging import getLogger
 
 from .line import Line
-from .patterns import REGEX_PARAM_NAME
+from .patterns import REGEX_PARAM_NAME, REGEX_TYPES
 from .route import Route
 
 logger = getLogger("sanic.root")
@@ -158,8 +158,15 @@ class Node:
                         ),
                         return_indent,
                     ),
+                    # Line("...", return_indent - 1, render=True),
                 ]
             )
+            if self.route.params:
+                location.append(Line("...", return_indent - 1, render=False))
+                if self.last:
+                    location.append(
+                        Line("...", return_indent - 2, render=False),
+                    )
         return src, delayed
 
     def add_child(self, child: "Node") -> None:
@@ -183,8 +190,10 @@ class Node:
 
     def _inject_params(self, location, indent):
         lines = [
-            Line("try:", indent),
+            Line(f"if num > {self.level}:", indent),
+            Line("raise NotFound", indent + 1),
         ]
+        lines.append(Line("try:", indent))
         for idx, param in self.route.params.items():
             unquote_start = "unquote(" if self.route.unquote else ""
             unquote_end = ")" if self.route.unquote else ""
@@ -207,9 +216,18 @@ class Node:
         )
 
     @staticmethod
-    def _sorting(item) -> t.Tuple[bool, int, str]:
+    def _sorting(item) -> t.Tuple[bool, int, str, int]:
         key, child = item
-        return child.dynamic, len(child._children) * -1, key
+        type_ = 0
+        if child.dynamic:
+            key = key[1:-1]
+            if ":" in key:
+                key, param_type = key.split(":")
+                try:
+                    type_ = list(REGEX_TYPES.keys()).index(param_type)
+                except ValueError:
+                    type_ = len(list(REGEX_TYPES.keys()))
+        return child.dynamic, len(child._children) * -1, key, type_ * -1
 
 
 class Tree:

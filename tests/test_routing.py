@@ -113,7 +113,7 @@ def test_cast_types_at_same_position(handler):
 @pytest.mark.parametrize(
     "label,value,cast_type",
     (
-        ("string", "foo", str),
+        ("string", "foo_-", str),
         ("int", 11111, int),
         ("number", 99.99, float),
         ("alpha", "ABCxyz", str),
@@ -123,7 +123,12 @@ def test_cast_types_at_same_position(handler):
 )
 def test_casting(handler, label, value, cast_type):
     router = Router()
-    router.add(f"/<foo:{label}>", handler)
+    router.add("/<foo:string>", handler)
+    router.add("/<foo:int>", handler)
+    router.add("/<foo:number>", handler)
+    router.add("/<foo:alpha>", handler)
+    router.add("/<foo:ymd>", handler)
+    router.add("/<foo:uuid>", handler)
 
     router.finalize()
     _, handler, params = router.get(f"/{value}", "BASE")
@@ -227,6 +232,9 @@ def test_use_route_type_coercion(handler):
     router.add("/test/<foo:int>", handler)
     router.add("/test/<foo:int>/bar", handler)
 
+    router.finalize(False)
+    print(router.find_route_src)
+    router.reset()
     router.finalize()
 
     router.get("/test/123", "BASE")
