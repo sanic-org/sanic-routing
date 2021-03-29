@@ -122,8 +122,6 @@ class Node:
                 if not self.children and not equality_check
                 else ""
             )
-            if if_stmt == "elif":
-                src.append(Line("...", 0, offset=0, render=False))
             src.append(
                 Line(
                     f'{if_stmt} parts[{level}] == "{self.part}"{len_check}:',
@@ -161,15 +159,6 @@ class Node:
                         return_indent,
                     ),
                 ]
-            )
-            # This is a control line to help control indentation, but
-            # it should not be rendered
-            location.append(
-                Line(
-                    "...",
-                    indent + return_bump + bool(not self.children),
-                    render=False,
-                )
             )
         return src, delayed
 

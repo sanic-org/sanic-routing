@@ -284,16 +284,8 @@ class BaseRouter(ABC):
         and realign lines to proper indentation
         """
         offset = 0
-        current = 0
         insert_at = set()
         for num, line in enumerate(src):
-            if line.indent < current:
-                if not line.src.startswith("."):
-                    if offset < 0:
-                        offset += 1
-                    else:
-                        offset = 0
-
             if (
                 line.src.startswith("if")
                 or line.src.startswith("elif")
@@ -309,7 +301,6 @@ class BaseRouter(ABC):
 
             offset += line.offset
             line.indent += offset
-            current = line.indent
 
         idnt = 1
         prev_line = src[-1]
