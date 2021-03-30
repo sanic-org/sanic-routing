@@ -232,9 +232,6 @@ def test_use_route_type_coercion(handler):
     router.add("/test/<foo:int>", handler)
     router.add("/test/<foo:int>/bar", handler)
 
-    router.finalize(False)
-    print(router.find_route_src)
-    router.reset()
     router.finalize()
 
     router.get("/test/123", "BASE")
