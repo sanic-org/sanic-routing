@@ -265,9 +265,13 @@ class BaseRouter(ABC):
                     "exec",
                 )
             except SyntaxError as se:
-                syntax_error = f"Line {se.lineno}: {se.msg}\n{se.text}{' '*max(0,se.offset-1) + '^'}"
+                syntax_error = (
+                    f"Line {se.lineno}: {se.msg}\n{se.text}"
+                    f"{' '*max(0,int(se.offset or 0)-1) + '^'}"
+                )
                 raise FinalizationError(
-                    f"Cannot compile route AST:\n{self.find_route_src}\n{syntax_error}"
+                    f"Cannot compile route AST:\n{self.find_route_src}"
+                    f"\n{syntax_error}"
                 )
             ctx: t.Dict[t.Any, t.Any] = {}
             exec(compiled_src, None, ctx)
