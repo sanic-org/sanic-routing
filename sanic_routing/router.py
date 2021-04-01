@@ -250,6 +250,8 @@ class BaseRouter(ABC):
                 ]
             ]
 
+        src.append(Line("raise NotFound", 1))
+
         self.optimize(src)
 
         self.find_route_src = "".join(
@@ -299,6 +301,7 @@ class BaseRouter(ABC):
                 or line.src.startswith("elif")
                 or line.src.startswith("return")
                 or line.src.startswith("basket")
+                or line.src.startswith("try")
             ):
 
                 idnt = line.indent + 1
