@@ -2,7 +2,6 @@ import uuid
 from datetime import date
 
 import pytest
-
 from sanic_routing import BaseRouter
 from sanic_routing.exceptions import NoMethod, NotFound, RouteExists
 
@@ -114,7 +113,7 @@ def test_cast_types_at_same_position(handler):
 @pytest.mark.parametrize(
     "label,value,cast_type",
     (
-        ("string", "foo", str),
+        ("string", "foo_-", str),
         ("int", 11111, int),
         ("number", 99.99, float),
         ("alpha", "ABCxyz", str),
@@ -124,7 +123,12 @@ def test_cast_types_at_same_position(handler):
 )
 def test_casting(handler, label, value, cast_type):
     router = Router()
-    router.add(f"/<foo:{label}>", handler)
+    router.add("/<foo:string>", handler)
+    router.add("/<foo:int>", handler)
+    router.add("/<foo:number>", handler)
+    router.add("/<foo:alpha>", handler)
+    router.add("/<foo:ymd>", handler)
+    router.add("/<foo:uuid>", handler)
 
     router.finalize()
     _, handler, params = router.get(f"/{value}", "BASE")
@@ -145,13 +149,16 @@ def test_conditional_check_proper_compile(handler):
 @pytest.mark.parametrize(
     "param_name",
     (
-        "fooBar", "foo_bar", "Foobar", "foobar1",
+        "fooBar",
+        "foo_bar",
+        "Foobar",
+        "foobar1",
     ),
 )
 def test_use_param_name(handler, param_name):
     router = Router()
     path_part_with_param = f"<{param_name}>"
-    router.add( f"/path/{path_part_with_param}", handler)
+    router.add(f"/path/{path_part_with_param}", handler)
     route = list(router.routes)[0]
     assert ("path", path_part_with_param) == route
 
@@ -159,32 +166,44 @@ def test_use_param_name(handler, param_name):
 @pytest.mark.parametrize(
     "param_name",
     (
-        "fooBar", "foo_bar", "Foobar", "foobar1",
+        "fooBar",
+        "foo_bar",
+        "Foobar",
+        "foobar1",
     ),
 )
 def test_use_param_name_with_casing(handler, param_name):
     router = Router()
     path_part_with_param = f"<{param_name}:str>"
-    router.add( f"/path/{path_part_with_param}", handler)
+    router.add(f"/path/{path_part_with_param}", handler)
     route = list(router.routes)[0]
     assert ("path", path_part_with_param) == route
+
 
 def test_use_route_contains_children(handler):
     router = Router()
     router.add("/foo/<foo_id>/bars_ids", handler)
-    router.add("/foo/<foo_id>/bars_ids/<bar_id>/settings/<group_id>/groups", handler)
+    router.add(
+        "/foo/<foo_id>/bars_ids/<bar_id>/settings/<group_id>/groups", handler
+    )
 
     router.finalize()
 
     bars_ids = router.get("/foo/123/bars_ids", "BASE")
-    bars_ids_groups = router.get("/foo/123/bars_ids/321/settings/111/groups", "BASE")
+    bars_ids_groups = router.get(
+        "/foo/123/bars_ids/321/settings/111/groups", "BASE"
+    )
 
     bars_ids_retval = bars_ids[1](**bars_ids[2])
     assert isinstance(bars_ids_retval, str)
     assert bars_ids_retval == "123"
 
     bars_ids_group_dict = bars_ids_groups[2]
-    assert bars_ids_group_dict == {'foo_id':'123', 'bar_id': '321', 'group_id': '111'}
+    assert bars_ids_group_dict == {
+        "foo_id": "123",
+        "bar_id": "321",
+        "group_id": "111",
+    }
 
 
 def test_use_route_with_different_depth(handler):
@@ -194,7 +213,9 @@ def test_use_route_with_different_depth(handler):
     router.add("/foo/<foo_id>/bars/<bar_id>/settings", handler)
     router.add("/foo/<foo_id>/bars_ids", handler)
     router.add("/foo/<foo_id>/bars_ids/<bar_id>/settings", handler)
-    router.add("/foo/<foo_id>/bars_ids/<bar_id>/settings/<group_id>/groups", handler)
+    router.add(
+        "/foo/<foo_id>/bars_ids/<bar_id>/settings/<group_id>/groups", handler
+    )
 
     router.finalize()
 
@@ -205,3 +226,48 @@ def test_use_route_with_different_depth(handler):
     router.get("/foo/123/bars_ids/321/settings", "BASE")
     router.get("/foo/123/bars_ids/321/settings/111/groups", "BASE")
 
+
+def test_use_route_type_coercion(handler):
+    router = Router()
+    router.add("/test/<foo:int>", handler)
+    router.add("/test/<foo:int>/bar", handler)
+
+    router.finalize()
+
+    router.get("/test/123", "BASE")
+    router.get("/test/123/bar", "BASE")
+
+    with pytest.raises(NotFound):
+        router.get("/test/foo/aaaa", "BASE")
+    with pytest.raises(NotFound):
+        router.get("/test/123/aaaa", "BASE")
+    with pytest.raises(NotFound):
+        router.get("/test/123/aaaa/bbbb", "BASE")
+
+
+def test_use_route_type_coercion_deeper(handler):
+    router = Router()
+    router.add("/test/<foo:int>", handler)
+    router.add("/test/<foo:int>/bar", handler)
+    router.add("/test/<foo:int>/bar/baz", handler)
+
+    router.finalize()
+
+    router.get("/test/123", "BASE")
+    router.get("/test/123/bar", "BASE")
+    router.get("/test/123/bar/baz", "BASE")
+
+    with pytest.raises(NotFound):
+        router.get("/test/foo/aaaa", "BASE")
+    with pytest.raises(NotFound):
+        router.get("/test/123/aaaa", "BASE")
+    with pytest.raises(NotFound):
+        router.get("/test/123/aaaa/bbbb", "BASE")
+    with pytest.raises(NotFound):
+        router.get("/test/123/aaaa/bbbb/cccc", "BASE")
+    with pytest.raises(NotFound):
+        router.get("/test/foo/bar", "BASE")
+    with pytest.raises(NotFound):
+        router.get("/test/123/bar/bbbb", "BASE")
+    with pytest.raises(NotFound):
+        router.get("/test/123/bar/bbbb/cccc", "BASE")
