@@ -258,11 +258,21 @@ class BaseRouter(ABC):
             map(str, filter(lambda x: x.render, src))
         )
         if do_compile:
-            compiled_src = compile(
-                self.find_route_src,
-                "",
-                "exec",
-            )
+            try:
+                compiled_src = compile(
+                    self.find_route_src,
+                    "",
+                    "exec",
+                )
+            except SyntaxError as se:
+                syntax_error = (
+                    f"Line {se.lineno}: {se.msg}\n{se.text}"
+                    f"{' '*max(0,int(se.offset or 0)-1) + '^'}"
+                )
+                raise FinalizationError(
+                    f"Cannot compile route AST:\n{self.find_route_src}"
+                    f"\n{syntax_error}"
+                )
             ctx: t.Dict[t.Any, t.Any] = {}
             exec(compiled_src, None, ctx)
             self._find_route = ctx["find_route"]
