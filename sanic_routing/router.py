@@ -234,9 +234,6 @@ class BaseRouter(ABC):
             src += self.tree.render()
 
         if self.regex_routes:
-            # TODO:
-            # - we should probably pre-compile the patterns and only
-            #   include them here by reference
             routes = sorted(
                 self.regex_routes.values(),
                 key=lambda route: len(route.parts),

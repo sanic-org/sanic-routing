@@ -293,7 +293,6 @@ def test_route_correct_coercion():
     router.add("/<test:ymd>", handler4)
 
     router.finalize()
-    print(router.find_route_src)
 
     _, h1, __ = router.get("/foo", "BASE")
     _, h2, __ = router.get("/123", "BASE")
