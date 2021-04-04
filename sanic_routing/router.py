@@ -249,7 +249,10 @@ class BaseRouter(ABC):
                         Line("basket['__params__'] = match.groupdict()", 2),
                         Line(f"basket['__raw_path__'] = '{route.path}'", 2),
                         Line(
-                            f"return router.name_index['{route.name}'], basket",
+                            (
+                                f"return router.name_index['{route.name}'], "
+                                "basket"
+                            ),
                             2,
                         ),
                     ]
