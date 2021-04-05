@@ -1,6 +1,5 @@
 import typing as t
 from abc import ABC, abstractmethod
-from itertools import count
 from types import SimpleNamespace
 
 from .exceptions import BadMethod, FinalizationError, NoMethod, NotFound
@@ -18,8 +17,6 @@ from urllib.parse import unquote  # noqa  isort:skip
 from uuid import UUID  # noqa  isort:skip
 from .patterns import parse_date  # noqa  isort:skip
 
-TMP = count()
-
 
 class BaseRouter(ABC):
     DEFAULT_METHOD = "BASE"
@@ -32,8 +29,10 @@ class BaseRouter(ABC):
         method_handler_exception: t.Type[NoMethod] = NoMethod,
         route_class: t.Type[Route] = Route,
         stacking: bool = False,
+        cascade_not_found: bool = False,
     ) -> None:
         self._find_route = None
+        self._matchers = None
         self.static_routes: t.Dict[t.Tuple[str, ...], Route] = {}
         self.dynamic_routes: t.Dict[t.Tuple[str, ...], Route] = {}
         self.regex_routes: t.Dict[t.Tuple[str, ...], Route] = {}
@@ -46,6 +45,7 @@ class BaseRouter(ABC):
         self.finalized = False
         self.stacking = stacking
         self.ctx = SimpleNamespace()
+        self.cascade_not_found = cascade_not_found
 
     @abstractmethod
     def get(self, **kwargs):
@@ -201,6 +201,7 @@ class BaseRouter(ABC):
             Line("def find_route(path, router, basket, extra):", 0),
             Line("parts = tuple(path[1:].split(router.delimiter))", 1),
         ]
+        delayed = []
 
         if self.static_routes:
             # TODO:
@@ -233,24 +234,33 @@ class BaseRouter(ABC):
             src += self.tree.render()
 
         if self.regex_routes:
-            # TODO:
-            # - we should probably pre-compile the patterns and only
-            #   include them here by reference
-            src += [
-                line
-                for route in self.regex_routes.values()
-                for line in [
-                    Line(f"match = re.match(r'^{route.pattern}$', path)", 1),
-                    Line("if match:", 1),
-                    Line("basket['__params__'] = match.groupdict()", 2),
-                    Line(f"basket['__raw_path__'] = '{route.path}'", 2),
-                    Line(
-                        f"return router.name_index['{route.name}'], basket", 2
-                    ),
-                ]
-            ]
+            routes = sorted(
+                self.regex_routes.values(),
+                key=lambda route: len(route.parts),
+                reverse=True,
+            )
+            delayed.append(Line("matchers = [", 0))
+            for idx, route in enumerate(routes):
+                delayed.append(Line(f"re.compile(r'^{route.pattern}$'),", 1))
+                src.extend(
+                    [
+                        Line(f"match = router.matchers[{idx}].match(path)", 1),
+                        Line("if match:", 1),
+                        Line("basket['__params__'] = match.groupdict()", 2),
+                        Line(f"basket['__raw_path__'] = '{route.path}'", 2),
+                        Line(
+                            (
+                                f"return router.name_index['{route.name}'], "
+                                "basket"
+                            ),
+                            2,
+                        ),
+                    ]
+                )
+            delayed.append(Line("]", 0))
 
         src.append(Line("raise NotFound", 1))
+        src.extend(delayed)
 
         self.optimize(src)
 
@@ -276,10 +286,15 @@ class BaseRouter(ABC):
             ctx: t.Dict[t.Any, t.Any] = {}
             exec(compiled_src, None, ctx)
             self._find_route = ctx["find_route"]
+            self._matchers = ctx.get("matchers")
 
     @property
     def find_route(self):
         return self._find_route
+
+    @property
+    def matchers(self):
+        return self._matchers
 
     @property
     def routes(self):
@@ -289,8 +304,7 @@ class BaseRouter(ABC):
             **self.regex_routes,
         }
 
-    @staticmethod
-    def optimize(src: t.List[Line]) -> None:
+    def optimize(self, src: t.List[Line]) -> None:
         """
         Insert NotFound exceptions to be able to bail as quick as possible,
         and realign lines to proper indentation
@@ -330,10 +344,11 @@ class BaseRouter(ABC):
             insert_at.add((len(src), idnt))
             idnt += 1
 
-        for num, indent in sorted(insert_at, key=lambda x: (x[0] * -1, x[1])):
-
-            next(TMP)
-            src.insert(num, Line("raise NotFound", indent))
+        if self.cascade_not_found:
+            for num, indent in sorted(
+                insert_at, key=lambda x: (x[0] * -1, x[1])
+            ):
+                src.insert(num, Line("raise NotFound", indent))
 
     def _is_regex(self, path: str):
         parts = path_to_parts(path, self.delimiter)

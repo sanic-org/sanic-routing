@@ -2,7 +2,6 @@ import uuid
 from datetime import date
 
 import pytest
-
 from sanic_routing import BaseRouter
 from sanic_routing.exceptions import NoMethod, NotFound, RouteExists
 
@@ -272,3 +271,35 @@ def test_use_route_type_coercion_deeper(handler):
         router.get("/test/123/bar/bbbb", "BASE")
     with pytest.raises(NotFound):
         router.get("/test/123/bar/bbbb/cccc", "BASE")
+
+
+def test_route_correct_coercion():
+    def handler1():
+        ...
+
+    def handler2():
+        ...
+
+    def handler3():
+        ...
+
+    def handler4():
+        ...
+
+    router = Router()
+    router.add("/<test:string>", handler1)
+    router.add("/<test:int>", handler2)
+    router.add("/<test:uuid>", handler3)
+    router.add("/<test:ymd>", handler4)
+
+    router.finalize()
+
+    _, h1, __ = router.get("/foo", "BASE")
+    _, h2, __ = router.get("/123", "BASE")
+    _, h3, __ = router.get("/726a7d33-4bd5-46a3-a02d-37da7b4b029b", "BASE")
+    _, h4, __ = router.get("/2021-03-21", "BASE")
+
+    assert h1 is handler1
+    assert h2 is handler2
+    assert h3 is handler3
+    assert h4 is handler4

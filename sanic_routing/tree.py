@@ -90,6 +90,7 @@ class Node:
                 and self.route
                 and not self.children
                 and not self.route.requirements
+                and not self.route.router.regex_routes
             ):
                 use_level = self.level
                 operation = "=="
@@ -138,6 +139,8 @@ class Node:
                     location, indent + return_bump + bool(not self.children)
                 )
             if self.route.params:
+                if not self.last:
+                    return_bump += 1
                 self._inject_params(
                     location, indent + return_bump + bool(not self.children)
                 )
@@ -189,10 +192,15 @@ class Node:
         )
 
     def _inject_params(self, location, indent):
-        lines = [
-            Line(f"if num > {self.level}:", indent),
-            Line("raise NotFound", indent + 1),
-        ]
+        if self.last:
+            lines = [
+                Line(f"if num > {self.level}:", indent),
+                Line("raise NotFound", indent + 1),
+            ]
+        else:
+            lines = [
+                Line(f"if num == {self.level}:", indent - 1),
+            ]
         lines.append(Line("try:", indent))
         for idx, param in self.route.params.items():
             unquote_start = "unquote(" if self.route.unquote else ""
@@ -209,7 +217,7 @@ class Node:
         location.extend(
             lines
             + [
-                Line("except ValueError:", indent),
+                Line("except (ValueError, KeyError):", indent),
                 Line("pass", indent + 1),
                 Line("else:", indent),
             ]
@@ -227,7 +235,7 @@ class Node:
                     type_ = list(REGEX_TYPES.keys()).index(param_type)
                 except ValueError:
                     type_ = len(list(REGEX_TYPES.keys()))
-        return child.dynamic, len(child._children) * -1, key, type_ * -1
+        return child.dynamic, len(child._children), key, type_ * -1
 
 
 class Tree:
