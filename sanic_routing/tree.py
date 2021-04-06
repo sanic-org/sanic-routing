@@ -78,6 +78,7 @@ class Node:
 
         level = self.level - 1
         equality_check = False
+        len_check = ""
         return_bump = 1
 
         if self.first or self.root:
@@ -164,6 +165,10 @@ class Node:
                     # Line("...", return_indent - 1, render=True),
                 ]
             )
+
+            if self.route.requirements and self.last and len_check:
+                location.append(Line("raise NotFound", return_indent - 1))
+
             if self.route.params:
                 location.append(Line("...", return_indent - 1, render=False))
                 if self.last:
