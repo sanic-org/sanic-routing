@@ -15,8 +15,8 @@ def handler():
 
 
 class Router(BaseRouter):
-    def get(self, path, method):
-        return self.resolve(path=path, method=method)
+    def get(self, path, method, extra=None):
+        return self.resolve(path=path, method=method, extra=extra)
 
 
 def test_add_route():
@@ -303,3 +303,39 @@ def test_route_correct_coercion():
     assert h2 is handler2
     assert h3 is handler3
     assert h4 is handler4
+
+
+def test_non_strict_bail_out():
+    def handler1():
+        return "handler1"
+
+    def handler2():
+        return "handler2"
+
+    def handler3():
+        return "handler3"
+
+    router = Router()
+    router.add("/test", handler1, requirements={"req": "foo"})
+    router.add("/test", handler2, requirements={"req": "bar"})
+    router.add("/test/ing", handler3, requirements={"req": "bar"})
+
+    router.finalize()
+
+    _, handler, __ = router.get("/test", "BASE", extra={"req": "foo"})
+    assert handler() == "handler1"
+
+    _, handler, __ = router.get("/test/", "BASE", extra={"req": "foo"})
+    assert handler() == "handler1"
+
+    _, handler, __ = router.get("/test", "BASE", extra={"req": "bar"})
+    assert handler() == "handler2"
+
+    _, handler, __ = router.get("/test/", "BASE", extra={"req": "bar"})
+    assert handler() == "handler2"
+
+    _, handler, __ = router.get("/test/ing", "BASE", extra={"req": "bar"})
+    assert handler() == "handler3"
+
+    _, handler, __ = router.get("/test/ing/", "BASE", extra={"req": "bar"})
+    assert handler() == "handler3"
