@@ -166,13 +166,12 @@ class Node:
                 ]
             )
 
-            if self.route.params or self.route.requirements:
+            if self.route.requirements and self.last and len_check:
+                location.append(Line("raise NotFound", return_indent - 1))
+
+            if self.route.params:
                 location.append(Line("...", return_indent - 1, render=False))
                 if self.last:
-                    if len_check:
-                        location.append(
-                            Line("raise NotFound", return_indent - 1)
-                        )
                     location.append(
                         Line("...", return_indent - 2, render=False),
                     )
