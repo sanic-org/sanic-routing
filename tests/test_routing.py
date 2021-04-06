@@ -339,3 +339,33 @@ def test_non_strict_bail_out():
 
     _, handler, __ = router.get("/test/ing/", "BASE", extra={"req": "bar"})
     assert handler() == "handler3"
+
+
+def test_non_strict_with_params():
+    def handler1():
+        return "handler1"
+
+    def handler2():
+        return "handler2"
+
+    router = Router()
+    router.add("/<foo>", handler1)
+    router.add("/<foo>/ing", handler2)
+
+    router.finalize()
+
+    _, handler, params = router.get("/test", "BASE")
+    assert handler() == "handler1"
+    assert params == {"foo": "test"}
+
+    _, handler, params = router.get("/test/", "BASE")
+    assert handler() == "handler1"
+    assert params == {"foo": "test"}
+
+    _, handler, params = router.get("/test/ing", "BASE")
+    assert handler() == "handler2"
+    assert params == {"foo": "test"}
+
+    _, handler, params = router.get("/test/ing/", "BASE")
+    assert handler() == "handler2"
+    assert params == {"foo": "test"}
