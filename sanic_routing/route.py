@@ -152,17 +152,6 @@ class Route:
             sorted(params.items(), key=lambda param: self._sorting(param[1]))
         )
 
-    # def _finalize_methods(self):
-    #     self.methods = set()
-    #     for handlers in self.handlers.values():
-    #         self.methods.update(set(key.upper() for key in handlers.keys()))
-
-    # def _finalize_handlers(self):
-    #     self.handlers = Immutable(self.handlers)
-
-    # def _reset_handlers(self):
-    #     self.handlers = dict(self.handlers)
-
     def _compile_regex(self):
         components = []
 
@@ -204,8 +193,6 @@ class Route:
         self._finalize_params()
         if self.regex:
             self._compile_regex()
-        # self._finalize_methods()
-        # self._finalize_handlers()
 
     def reset(self):
         self._reset_handlers()
