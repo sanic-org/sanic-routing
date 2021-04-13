@@ -77,8 +77,6 @@ class BaseRouter(ABC):
                 )
             raise self.exception(str(e), path=path)
 
-        # handler_idx = param_basket.pop("__handler_idx__")
-        # raw_path = param_basket.pop("__raw_path__")
         params = param_basket.pop("__params__")
 
         if route.strict and orig and orig[-1] != route.path[-1]:
