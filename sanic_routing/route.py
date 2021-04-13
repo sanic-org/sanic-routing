@@ -1,9 +1,9 @@
 import re
 import typing as t
-from collections import defaultdict, namedtuple
+from collections import namedtuple
 from types import SimpleNamespace
 
-from .exceptions import InvalidUsage, ParameterNameConflicts, RouteExists
+from .exceptions import InvalidUsage, ParameterNameConflicts
 from .patterns import REGEX_TYPES
 from .utils import Immutable, parts_to_path, path_to_parts
 
@@ -12,7 +12,7 @@ ParamInfo = namedtuple(
 )
 
 
-class Requirements(dict):
+class Requirements(Immutable):
     def __hash__(self):
         return hash(frozenset(self.items()))
 
