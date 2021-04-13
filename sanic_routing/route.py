@@ -77,7 +77,7 @@ class Route:
 
         self._setup_params()
 
-    def __repr__(self):
+    def __str__(self):
         display = (
             f"name={self.name} path={self.path or self.router.delimiter}"
             if self.name and self.name != self.path
