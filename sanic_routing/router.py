@@ -166,7 +166,6 @@ class BaseRouter(ABC):
         if not static and route.parts in self.static_routes:
             existing_group = self.static_routes.pop(route.parts)
             group.merge(existing_group, overwrite)
-            # self.dynamic_routes[route.parts] = route
 
         else:
             if route.parts in routes:
