@@ -22,10 +22,11 @@ class Route:
         "_params",
         "_raw_path",
         "ctx",
-        "handlers",
+        "handler",
         "labels",
         "methods",
         "name",
+        "overloaded",
         "params",
         "parts",
         "path",
@@ -36,7 +37,6 @@ class Route:
         "static",
         "strict",
         "unquote",
-        "overloaded",
     )
 
     def __init__(
@@ -44,6 +44,9 @@ class Route:
         router,
         raw_path: str,
         name: str,
+        handler: t.Callable[..., t.Any],
+        methods: t.Iterable[str],
+        requirements: t.Dict[str, t.Any] = None,
         strict: bool = False,
         unquote: bool = False,
         static: bool = False,
@@ -52,10 +55,14 @@ class Route:
     ):
         self.router = router
         self.name = name
-        self.handlers = defaultdict(lambda: defaultdict(list))  # type: ignore
+        self.handler = handler
+        self.methods = methods
+        self.requirements = Requirements(requirements or {})
+
+        self.ctx = SimpleNamespace()
+
         self._params: t.Dict[int, ParamInfo] = {}
         self._raw_path = raw_path
-        self.ctx = SimpleNamespace()
 
         parts = path_to_parts(raw_path, self.router.delimiter)
         self.path = parts_to_path(parts, delimiter=self.router.delimiter)
@@ -66,8 +73,9 @@ class Route:
         self.pattern = None
         self.strict: bool = strict
         self.unquote: bool = unquote
-        self.requirements: t.Dict[int, t.Any] = {}
         self.labels: t.Optional[t.List[str]] = None
+
+        self._setup_params()
 
     def __repr__(self):
         display = (
@@ -77,53 +85,24 @@ class Route:
         )
         return f"<{self.__class__.__name__}: {display}>"
 
-    def get_handler(self, raw_path, method, idx):
-        method = method or self.router.DEFAULT_METHOD
-        raw_path = raw_path.lstrip(self.router.delimiter)
-        try:
-            return self.handlers[raw_path][method][idx]
-        except (IndexError, KeyError):
-            raise self.router.method_handler_exception(
-                f"Method '{method}' not found on {self}",
-                method=method,
-                allowed_methods=self.methods,
-            )
-
-    def add_handler(
-        self,
-        raw_path,
-        handler,
-        method,
-        requirements,
-        overwrite: bool = False,
-    ):
-        key_path = parts_to_path(
-            path_to_parts(raw_path, self.router.delimiter),
-            self.router.delimiter,
+    def __eq__(self, other) -> bool:
+        if not isinstance(other, self.__class__):
+            return False
+        return (self.parts, self.requirements, self.methods,) == (
+            other.parts,
+            other.requirements,
+            other.methods,
         )
 
-        if (
-            not self.router.stacking
-            and self.handlers.get(key_path, {}).get(method)
-            and (
-                requirements is None
-                or Requirements(requirements) in self.requirements.values()
-            )
-            and not overwrite
-        ):
-            raise RouteExists(
-                f"Route already registered: {key_path} [{method}]"
-            )
-
-        idx = len(self.handlers[key_path][method.upper()])
-        self.handlers[key_path][method.upper()].append(handler)
-        if requirements is not None:
-            self.requirements[idx] = Requirements(requirements)
-
+    def _setup_params(self):
+        key_path = parts_to_path(
+            path_to_parts(self.raw_path, self.router.delimiter),
+            self.router.delimiter,
+        )
         if not self.static:
             parts = path_to_parts(key_path, self.router.delimiter)
             for idx, part in enumerate(parts):
-                if "<" in part and len(self.handlers[key_path]) == 1:
+                if "<" in part:
                     if ":" in part:
                         (
                             name,
@@ -138,6 +117,33 @@ class Route:
                         self.add_parameter(
                             idx, part[1:-1], key_path, "string", str, None
                         )
+
+    def add_handler(
+        self,
+        raw_path,
+        handler,
+        method,
+        requirements,
+        overwrite: bool = False,
+    ):
+        ...
+        # key_path = parts_to_path(
+        #     path_to_parts(raw_path, self.router.delimiter),
+        #     self.router.delimiter,
+        # )
+
+        # if (
+        #     not self.router.stacking
+        #     and self.handlers.get(key_path, {}).get(method)
+        #     and (
+        #         requirements is None
+        #         or Requirements(requirements) in self.requirements.values()
+        #     )
+        #     and not overwrite
+        # ):
+        #     raise RouteExists(
+        #         f"Route already registered: {key_path} [{method}]"
+        #     )
 
     def add_parameter(
         self,
@@ -173,16 +179,16 @@ class Route:
             sorted(params.items(), key=lambda param: self._sorting(param[1]))
         )
 
-    def _finalize_methods(self):
-        self.methods = set()
-        for handlers in self.handlers.values():
-            self.methods.update(set(key.upper() for key in handlers.keys()))
+    # def _finalize_methods(self):
+    #     self.methods = set()
+    #     for handlers in self.handlers.values():
+    #         self.methods.update(set(key.upper() for key in handlers.keys()))
 
-    def _finalize_handlers(self):
-        self.handlers = Immutable(self.handlers)
+    # def _finalize_handlers(self):
+    #     self.handlers = Immutable(self.handlers)
 
-    def _reset_handlers(self):
-        self.handlers = dict(self.handlers)
+    # def _reset_handlers(self):
+    #     self.handlers = dict(self.handlers)
 
     def _compile_regex(self):
         components = []
@@ -225,11 +231,15 @@ class Route:
         self._finalize_params()
         if self.regex:
             self._compile_regex()
-        self._finalize_methods()
-        self._finalize_handlers()
+        # self._finalize_methods()
+        # self._finalize_handlers()
 
     def reset(self):
         self._reset_handlers()
+
+    @property
+    def defined_params(self):
+        return self._params
 
     @property
     def raw_path(self):
