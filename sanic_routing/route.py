@@ -118,33 +118,6 @@ class Route:
                             idx, part[1:-1], key_path, "string", str, None
                         )
 
-    def add_handler(
-        self,
-        raw_path,
-        handler,
-        method,
-        requirements,
-        overwrite: bool = False,
-    ):
-        ...
-        # key_path = parts_to_path(
-        #     path_to_parts(raw_path, self.router.delimiter),
-        #     self.router.delimiter,
-        # )
-
-        # if (
-        #     not self.router.stacking
-        #     and self.handlers.get(key_path, {}).get(method)
-        #     and (
-        #         requirements is None
-        #         or Requirements(requirements) in self.requirements.values()
-        #     )
-        #     and not overwrite
-        # ):
-        #     raise RouteExists(
-        #         f"Route already registered: {key_path} [{method}]"
-        #     )
-
     def add_parameter(
         self,
         idx: int,
