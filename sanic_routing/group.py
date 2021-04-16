@@ -1,7 +1,11 @@
+from sanic_routing.utils import Immutable
+
 from .exceptions import InvalidUsage, RouteExists
 
 
 class RouteGroup:
+    methods_index: Immutable
+
     def __init__(self, *routes) -> None:
         if len(set(route.parts for route in routes)) > 1:
             raise InvalidUsage("Cannout group routes with differing paths")
@@ -15,11 +19,6 @@ class RouteGroup:
         route_list.pop()
 
         self._routes = routes
-        self._method_index = {
-            method: route
-            for route in route_list
-            for method in route.defined_methods
-        }
         self.pattern_idx = 0
 
     def __str__(self):
@@ -34,11 +33,33 @@ class RouteGroup:
     def __getitem__(self, key):
         return self.routes[key]
 
+    def finalize(self):
+        self.methods_index = Immutable(
+            {
+                method: route
+                for route in self._routes
+                for method in route.methods
+            }
+        )
+
+    def reset(self):
+        self.methods_index = dict(self.methods_index)
+
     def merge(self, group, overwrite: bool = False):
         _routes = list(self._routes)
         for other_route in group.routes:
             for current_route in self:
-                if current_route == other_route:
+                if (
+                    current_route == other_route
+                    or (
+                        current_route.requirements
+                        and not other_route.requirements
+                    )
+                    or (
+                        not current_route.requirements
+                        and other_route.requirements
+                    )
+                ):
                     if not overwrite:
                         raise RouteExists(
                             f"Route already registered: {self.raw_path} "

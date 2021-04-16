@@ -56,7 +56,7 @@ class Route:
         self.router = router
         self.name = name
         self.handler = handler
-        self.methods = methods
+        self.methods = frozenset(methods)
         self.requirements = Requirements(requirements or {})
 
         self.ctx = SimpleNamespace()
@@ -88,11 +88,10 @@ class Route:
     def __eq__(self, other) -> bool:
         if not isinstance(other, self.__class__):
             return False
-        return (self.parts, self.requirements, self.methods,) == (
+        return (self.parts, self.requirements,) == (
             other.parts,
             other.requirements,
-            other.methods,
-        )
+        ) and (self.methods & other.methods)
 
     def _setup_params(self):
         key_path = parts_to_path(
@@ -193,9 +192,10 @@ class Route:
         self._finalize_params()
         if self.regex:
             self._compile_regex()
+        self.requirements = Immutable(self.requirements)
 
     def reset(self):
-        self._reset_handlers()
+        self.requirements = dict(self.requirements)
 
     @property
     def defined_params(self):

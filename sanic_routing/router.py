@@ -67,7 +67,7 @@ class BaseRouter(ABC):
             route, param_basket = self.find_route(
                 path, method, self, {"__params__": {}}, extra
             )
-        except NotFound as e:
+        except (NotFound, NoMethod) as e:
             if path.endswith(self.delimiter):
                 return self.resolve(
                     path=path[:-1],
@@ -76,6 +76,16 @@ class BaseRouter(ABC):
                     extra=extra,
                 )
             raise self.exception(str(e), path=path)
+
+        if isinstance(route, RouteGroup):
+            try:
+                route = route.methods_index[method]
+            except KeyError:
+                raise self.method_handler_exception(
+                    f"Method '{method}' not found on {route}",
+                    method=method,
+                    allowed_methods=route.methods,
+                )
 
         params = param_basket.pop("__params__")
 
@@ -177,6 +187,8 @@ class BaseRouter(ABC):
         if name:
             self.name_index[name] = route
 
+        group.finalize()
+
         return route
 
     def finalize(self, do_compile: bool = True):
@@ -186,8 +198,14 @@ class BaseRouter(ABC):
             raise FinalizationError("Cannot finalize with no routes defined.")
         self.finalized = True
 
-        for route in self.routes:
-            route.finalize()
+        for group in (
+            list(self.static_routes.values())
+            + list(self.dynamic_routes.values())
+            + list(self.regex_routes.values())
+        ):
+            group.finalize()
+            for route in group.routes:
+                route.finalize()
 
         self._generate_tree()
         self._render(do_compile)
@@ -197,8 +215,14 @@ class BaseRouter(ABC):
         self.tree = Tree()
         self._find_route = None
 
-        for route in self.routes.values():
-            route.reset()
+        for group in (
+            list(self.static_routes.values())
+            + list(self.dynamic_routes.values())
+            + list(self.regex_routes.values())
+        ):
+            group.reset()
+            for route in group.routes:
+                route.reset()
 
     def _generate_tree(self) -> None:
         self.tree.generate(
@@ -221,9 +245,12 @@ class BaseRouter(ABC):
             #   potentially has an impact on performance
             src += [
                 Line("try:", 1),
-                Line("route = router.static_routes[parts][0]", 2),
+                Line(
+                    "group = router.static_routes[parts]",
+                    2,
+                ),
                 Line("basket['__raw_path__'] = path", 2),
-                Line("return route, basket", 2),
+                Line("return group, basket", 2),
                 Line("except KeyError:", 1),
                 Line("pass", 2),
             ]
@@ -251,7 +278,7 @@ class BaseRouter(ABC):
                 delayed.append(Line(f"re.compile(r'^{group.pattern}$'),", 1))
             delayed.append(Line("]", 0))
 
-        if self.dynamic_routes or self.dynamic_routes:
+        if self.dynamic_routes or self.regex_routes:
             src += [Line("num = len(parts)", 1)]
             src += self.tree.render()
 

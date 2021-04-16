@@ -56,14 +56,16 @@ class Node:
 
     def render(self) -> t.List[Line]:
         if not self.root:
-            output, delayed = self.to_src()
+            output, delayed, final = self.to_src()
         else:
             output = []
             delayed = []
+            final = []
         for child in self.children.values():
-            output += child.render()
-        output += delayed
-        return output
+            o, f = child.render()
+            output += o
+            final += f
+        return output + delayed, final
 
     def apply_offset(self, amt, apply_self=True, apply_children=False):
         if apply_self:
@@ -85,7 +87,10 @@ class Node:
 
         if self.first:
             if level == 0:
-                src.append(Line("if parts[0]:", indent))
+                if self.group:
+                    src.append(Line("if True:", indent))
+                else:
+                    src.append(Line("if parts[0]:", indent))
             else:
                 operation = ">"
                 use_level = level
@@ -103,7 +108,9 @@ class Node:
                     src.extend(
                         [
                             Line(f"if num > {use_level}:", indent),
-                            Line("raise NotFound", indent + 1),
+                            Line("...", indent + 1)
+                            if self._has_nested_path(self)
+                            else Line("raise NotFound", indent + 1),
                         ]
                     )
                 src.append(
@@ -178,22 +185,14 @@ class Node:
                     ]
                 )
             if self.group.regex:
-                return_indent += 1
-                location.extend(
-                    [
-                        Line(
-                            (
-                                "match = router.matchers"
-                                f"[{self.group.pattern_idx}].match(path)"
-                            ),
-                            return_indent - 1,
-                        ),
-                        Line("if match:", return_indent - 1),
-                        Line(
-                            "basket['__params__'] = match.groupdict()",
-                            return_indent,
-                        ),
-                    ]
+                if self._has_nested_path(self, recursive=False):
+                    location.append(Line("...", return_indent - 1))
+                    return_indent = 2
+                    location = final
+                self._inject_regex(
+                    location,
+                    return_indent,
+                    not self.parent.children_param_injected,
                 )
             routes = "regex_routes" if self.group.regex else "dynamic_routes"
             location.extend(
@@ -207,7 +206,8 @@ class Node:
                     ),
                 ]
             )
-        return src, delayed + final
+
+        return src, delayed, final
 
     def add_child(self, child: "Node") -> None:
         self._children[child.part] = child
@@ -240,6 +240,24 @@ class Node:
             [
                 Line(("else:"), indent),
                 Line(("raise NotFound"), indent + 1),
+            ]
+        )
+
+    def _inject_regex(self, location, indent, first_params):
+        location.extend(
+            [
+                Line(
+                    (
+                        "match = router.matchers"
+                        f"[{self.group.pattern_idx}].match(path)"
+                    ),
+                    indent - 1,
+                ),
+                Line("if match:", indent - 1),
+                Line(
+                    "basket['__params__'] = match.groupdict()",
+                    indent,
+                ),
             ]
         )
 
@@ -276,6 +294,18 @@ class Node:
                 Line("else:", indent),
             ]
         )
+
+    def _has_nested_path(self, node, recursive=True):
+        if node.group and (
+            (node.group.labels and "path" in node.group.labels)
+            or (node.group.pattern and r"/" in node.group.pattern)
+        ):
+            return True
+        if recursive and node.children:
+            for child in node.children:
+                if self._has_nested_path(child):
+                    return True
+        return False
 
     @staticmethod
     def _sorting(item) -> t.Tuple[bool, int, str, bool, int]:
@@ -325,7 +355,8 @@ class Tree:
         self.root.display()
 
     def render(self) -> t.List[Line]:
-        return self.root.render()
+        o, f = self.root.render()
+        return o + f
 
     def finalize(self):
         self.root.finalize_children()
