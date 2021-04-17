@@ -195,12 +195,15 @@ class Node:
                     not self.parent.children_param_injected,
                 )
             routes = "regex_routes" if self.group.regex else "dynamic_routes"
+            route_return = (
+                "" if self.group.router.stacking else f"[{route_idx}]"
+            )
             location.extend(
                 [
                     Line(
                         (
                             f"return router.{routes}[{self.group.parts}]"
-                            f"[{route_idx}], basket"
+                            f"{route_return}, basket"
                         ),
                         return_indent,
                     ),

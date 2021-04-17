@@ -45,7 +45,7 @@ class RouteGroup:
     def reset(self):
         self.methods_index = dict(self.methods_index)
 
-    def merge(self, group, overwrite: bool = False):
+    def merge(self, group, overwrite: bool = False, append: bool = False):
         _routes = list(self._routes)
         for other_route in group.routes:
             for current_route in self:
@@ -59,7 +59,7 @@ class RouteGroup:
                         not current_route.requirements
                         and other_route.requirements
                     )
-                ):
+                ) and not append:
                     if not overwrite:
                         raise RouteExists(
                             f"Route already registered: {self.raw_path} "

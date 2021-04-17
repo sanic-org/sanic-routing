@@ -142,7 +142,11 @@ def test_casting(handler, label, value, cast_type):
 def test_conditional_check_proper_compile(handler):
     router = Router()
     router.add("/<foo>/", handler, strict=True)
-    router.add("/<foo>/", handler, strict=True, requirements={"foo": "bar"})
+
+    with pytest.raises(RouteExists):
+        router.add(
+            "/<foo>/", handler, strict=True, requirements={"foo": "bar"}
+        )
     router.finalize()
 
     assert router.finalized

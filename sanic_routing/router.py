@@ -111,7 +111,13 @@ class BaseRouter(ABC):
         strict: bool = False,
         unquote: bool = False,  # noqa
         overwrite: bool = False,
+        append: bool = False,
     ) -> Route:
+        if overwrite and append:
+            raise FinalizationError(
+                "Cannot add a route with both overwrite and append equal "
+                "to True"
+            )
         if not methods:
             methods = [self.DEFAULT_METHOD]
 
@@ -175,12 +181,12 @@ class BaseRouter(ABC):
         # and then as dynamic
         if not static and route.parts in self.static_routes:
             existing_group = self.static_routes.pop(route.parts)
-            group.merge(existing_group, overwrite)
+            group.merge(existing_group, overwrite, append)
 
         else:
             if route.parts in routes:
                 existing_group = routes[route.parts]
-                group.merge(existing_group, overwrite)
+                group.merge(existing_group, overwrite, append)
 
             routes[route.parts] = group
 
