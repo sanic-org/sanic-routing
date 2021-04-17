@@ -54,13 +54,13 @@ class Node:
         for child in self.children.values():
             child.display()
 
-    def render(self) -> t.List[Line]:
+    def render(self) -> t.Tuple[t.List[Line], t.List[Line]]:
+        output: t.List[Line] = []
+        delayed: t.List[Line] = []
+        final: t.List[Line] = []
+
         if not self.root:
             output, delayed, final = self.to_src()
-        else:
-            output = []
-            delayed = []
-            final = []
         for child in self.children.values():
             o, f = child.render()
             output += o
@@ -74,7 +74,7 @@ class Node:
             for child in self.children.values():
                 child.apply_offset(amt, apply_children=True)
 
-    def to_src(self) -> t.Tuple[t.List[Line], t.List[Line]]:
+    def to_src(self) -> t.Tuple[t.List[Line], t.List[Line], t.List[Line]]:
         indent = (self.level + 1) * 2 - 3 + self.offset
         delayed: t.List[Line] = []
         final: t.List[Line] = []

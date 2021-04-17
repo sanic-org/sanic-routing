@@ -88,10 +88,17 @@ class Route:
     def __eq__(self, other) -> bool:
         if not isinstance(other, self.__class__):
             return False
-        return (self.parts, self.requirements,) == (
-            other.parts,
-            other.requirements,
-        ) and (self.methods & other.methods)
+        return bool(
+            (
+                self.parts,
+                self.requirements,
+            )
+            == (
+                other.parts,
+                other.requirements,
+            )
+            and (self.methods & other.methods)
+        )
 
     def _setup_params(self):
         key_path = parts_to_path(
