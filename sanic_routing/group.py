@@ -8,12 +8,10 @@ class RouteGroup:
 
     def __init__(self, *routes) -> None:
         if len(set(route.parts for route in routes)) > 1:
-            raise InvalidUsage("Cannout group routes with differing paths")
+            raise InvalidUsage("Cannot group routes with differing paths")
 
         if any(routes[-1].strict != route.strict for route in routes):
-            raise InvalidUsage(
-                "Cannout group routes with differing strictness"
-            )
+            raise InvalidUsage("Cannot group routes with differing strictness")
 
         route_list = list(routes)
         route_list.pop()

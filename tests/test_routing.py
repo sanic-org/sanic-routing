@@ -229,8 +229,8 @@ def test_use_route_with_different_depth(handler):
     router.get("/foo/123/settings", "BASE")
     router.get("/foo/123/bars/321/settings", "BASE")
     router.get("/foo/123/bars_ids", "BASE")
-    # router.get("/foo/123/bars_ids/321/settings", "BASE")
-    # router.get("/foo/123/bars_ids/321/settings/111/groups", "BASE")
+    router.get("/foo/123/bars_ids/321/settings", "BASE")
+    router.get("/foo/123/bars_ids/321/settings/111/groups", "BASE")
 
 
 def test_use_route_type_coercion(handler):
