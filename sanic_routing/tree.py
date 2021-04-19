@@ -25,6 +25,7 @@ class Node:
         self.last = False
         self.children_basketed = False
         self.children_param_injected = False
+        self.has_deferred = False
 
     def __str__(self) -> str:
         internals = ", ".join(
@@ -154,6 +155,8 @@ class Node:
             if self.group.params and not self.group.regex:
                 if not self.last:
                     return_bump += 1
+                if self.parent.has_deferred:
+                    return_bump += 1
                 self._inject_params(
                     location,
                     indent + return_bump + bool(not self.children),
@@ -165,6 +168,17 @@ class Node:
             return_indent = (
                 indent + return_bump + bool(not self.children) + param_offset
             )
+            if self.group.regex:
+                if self._has_nested_path(self, recursive=False):
+                    location.append(Line("...", return_indent - 1))
+                    return_indent = 2
+                    location = final
+                    self._mark_parents_defer(self.parent)
+                self._inject_regex(
+                    location,
+                    return_indent,
+                    not self.parent.children_param_injected,
+                )
             if route_idx == 0 and len(self.group.routes) > 1:
                 route_idx = "route_idx"
                 for i, route in enumerate(self.group.routes):
@@ -183,16 +197,6 @@ class Node:
                         Line("else:", return_indent),
                         Line("raise NoMethod", return_indent + 1),
                     ]
-                )
-            if self.group.regex:
-                if self._has_nested_path(self, recursive=False):
-                    location.append(Line("...", return_indent - 1))
-                    return_indent = 2
-                    location = final
-                self._inject_regex(
-                    location,
-                    return_indent,
-                    not self.parent.children_param_injected,
                 )
             routes = "regex_routes" if self.group.regex else "dynamic_routes"
             route_return = (
@@ -214,6 +218,11 @@ class Node:
 
     def add_child(self, child: "Node") -> None:
         self._children[child.part] = child
+
+    def _mark_parents_defer(self, parent):
+        parent.has_deferred = True
+        if getattr(parent, "parent", None):
+            self._mark_parents_defer(parent.parent)
 
     def _inject_requirements(self, location, indent):
         for k, route in enumerate(self.group):
@@ -266,10 +275,15 @@ class Node:
 
     def _inject_params(self, location, indent, first_params):
         if self.last:
-            lines = [
-                Line(f"if num > {self.level}:", indent),
-                Line("raise NotFound", indent + 1),
-            ]
+            if self.parent.has_deferred:
+                lines = [
+                    Line(f"if num == {self.level}:", indent - 1),
+                ]
+            else:
+                lines = [
+                    Line(f"if num > {self.level}:", indent),
+                    Line("raise NotFound", indent + 1),
+                ]
         else:
             lines = []
             if first_params:

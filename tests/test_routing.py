@@ -389,10 +389,38 @@ def test_path_with_paamayim_nekudotayim():
 
     router.finalize()
 
-    print(router.find_route_src)
-
     _, handler, params = router.get(
         "/path/to/726a7d33-4bd5-46a3-a02d-37da7b4b029b.jpeg", "BASE"
     )
     assert handler(**params) == params
     assert params == {"file_uuid": "726a7d33-4bd5-46a3-a02d-37da7b4b029b"}
+
+
+def test_multiple_handlers_on_final_regex_segment(handler):
+    def handler1():
+        return "handler1"
+
+    def handler2():
+        return "handler2"
+
+    router = Router()
+    router.add("/path/to/<foo:bar>", handler1, methods=("one", "two"))
+    router.add("/path/to/<foo:bar>", handler2, methods=("three",))
+    router.add("/path/<to>/distraction", handler)
+    router.add("/path/<to>", handler)
+    router.add("/path", handler)
+    router.add("/somehwere/<else>", handler)
+
+    router.finalize()
+
+    _, handler, params = router.get("/path/to/bar", "one")
+    assert handler() == "handler1"
+    assert params == {"foo": "bar"}
+
+    _, handler, params = router.get("/path/to/bar", "two")
+    assert handler() == "handler1"
+    assert params == {"foo": "bar"}
+
+    _, handler, params = router.get("/path/to/bar", "three")
+    assert handler() == "handler2"
+    assert params == {"foo": "bar"}
