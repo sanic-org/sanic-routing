@@ -317,7 +317,7 @@ class Node:
         if child.dynamic:
             key = key[1:-1]
             if ":" in key:
-                key, param_type = key.split(":")
+                key, param_type = key.split(":", 1)
                 try:
                     type_ = list(REGEX_TYPES.keys()).index(param_type)
                 except ValueError:

@@ -2,7 +2,6 @@ import uuid
 from datetime import date
 
 import pytest
-
 from sanic_routing import BaseRouter
 from sanic_routing.exceptions import NoMethod, NotFound, RouteExists
 
@@ -376,3 +375,24 @@ def test_non_strict_with_params():
     _, handler, params = router.get("/test/ing/", "BASE")
     assert handler() == "handler2"
     assert params == {"foo": "test"}
+
+
+def test_path_with_paamayim_nekudotayim():
+    def handler(**kwargs):
+        return kwargs
+
+    router = Router()
+    router.add(
+        r"/path/to/<file_uuid:(?P<file_uuid>[A-Fa-f0-9]{8}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{12})(?:\.[A-z]{1,4})?>",
+        handler,
+    )
+
+    router.finalize()
+
+    print(router.find_route_src)
+
+    _, handler, params = router.get(
+        "/path/to/726a7d33-4bd5-46a3-a02d-37da7b4b029b.jpeg", "BASE"
+    )
+    assert handler(**params) == params
+    assert params == {"file_uuid": "726a7d33-4bd5-46a3-a02d-37da7b4b029b"}
