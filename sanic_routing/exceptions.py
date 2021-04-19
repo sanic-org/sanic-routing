@@ -22,7 +22,7 @@ class BadMethod(BaseException):
 class NoMethod(BaseException):
     def __init__(
         self,
-        message: str,
+        message: str = "Method does not exist",
         method: Optional[str] = None,
         allowed_methods: Optional[Set[str]] = None,
     ):

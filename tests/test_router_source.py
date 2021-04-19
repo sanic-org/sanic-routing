@@ -1,4 +1,5 @@
 import pytest
+
 from sanic_routing import BaseRouter
 
 
@@ -10,8 +11,8 @@ class Router(BaseRouter):
 @pytest.mark.parametrize(
     "cascade,lines,not_founds",
     (
-        (True, 32, 6),
-        (False, 30, 4),
+        (True, 32, 8),
+        (False, 28, 4),
     ),
 )
 def test_route_correct_coercion(cascade, lines, not_founds):
@@ -23,5 +24,6 @@ def test_route_correct_coercion(cascade, lines, not_founds):
     router.add("/<one>/two/three", handler)
 
     router.finalize()
+
     assert router.find_route_src.count("\n") == lines
     assert router.find_route_src.count("raise NotFound") == not_founds

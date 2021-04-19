@@ -2,6 +2,7 @@ import uuid
 from datetime import date
 
 import pytest
+
 from sanic_routing import BaseRouter
 from sanic_routing.exceptions import NoMethod, NotFound, RouteExists
 
@@ -43,14 +44,18 @@ def test_add_duplicate_route_fails():
     router = Router()
 
     router.add("/foo/bar", lambda *args, **kwargs: ...)
+    assert len(router.routes) == 1
     with pytest.raises(RouteExists):
         router.add("/foo/bar", lambda *args, **kwargs: ...)
     router.add("/foo/bar", lambda *args, **kwargs: ..., overwrite=True)
+    assert len(router.routes) == 1
 
     router.add("/foo/<bar>", lambda *args, **kwargs: ...)
+    assert len(router.routes) == 2
     with pytest.raises(RouteExists):
         router.add("/foo/<bar>", lambda *args, **kwargs: ...)
     router.add("/foo/<bar>", lambda *args, **kwargs: ..., overwrite=True)
+    assert len(router.routes) == 2
 
 
 def test_add_duplicate_route_alt_method():
@@ -63,14 +68,12 @@ def test_add_duplicate_route_alt_method():
     assert len(router.static_routes) == 1
     assert len(router.dynamic_routes) == 2
 
-    static_handlers = list(
-        list(router.static_routes.values())[0].handlers.values()
-    )
-    assert len(static_handlers[0]) == 2
+    static_handlers = list(router.static_routes.values())[0]
+    assert len(static_handlers.routes) == 2
 
-    for route in router.dynamic_routes.values():
-        assert len(list(route.handlers.values())) == 1
-        assert len(list(route.handlers.values())) == 1
+    for group in router.dynamic_routes.values():
+        assert len(group.routes) == 1
+        assert len(group.routes) == 1
 
 
 def test_route_does_not_exist():
@@ -140,7 +143,11 @@ def test_casting(handler, label, value, cast_type):
 def test_conditional_check_proper_compile(handler):
     router = Router()
     router.add("/<foo>/", handler, strict=True)
-    router.add("/<foo>/", handler, strict=True, requirements={"foo": "bar"})
+
+    with pytest.raises(RouteExists):
+        router.add(
+            "/<foo>/", handler, strict=True, requirements={"foo": "bar"}
+        )
     router.finalize()
 
     assert router.finalized
@@ -160,7 +167,7 @@ def test_use_param_name(handler, param_name):
     path_part_with_param = f"<{param_name}>"
     router.add(f"/path/{path_part_with_param}", handler)
     route = list(router.routes)[0]
-    assert ("path", path_part_with_param) == route
+    assert ("path", path_part_with_param) == route.parts
 
 
 @pytest.mark.parametrize(
@@ -177,7 +184,7 @@ def test_use_param_name_with_casing(handler, param_name):
     path_part_with_param = f"<{param_name}:str>"
     router.add(f"/path/{path_part_with_param}", handler)
     route = list(router.routes)[0]
-    assert ("path", path_part_with_param) == route
+    assert ("path", path_part_with_param) == route.parts
 
 
 def test_use_route_contains_children(handler):
