@@ -138,7 +138,6 @@ class Route:
         cast: t.Type,
         pattern=None,
     ):
-        print(f"Adding {idx=} {name=} {label=} {pattern=}")
         if pattern and isinstance(pattern, str):
             if not pattern.startswith("^"):
                 pattern = f"^{pattern}"
