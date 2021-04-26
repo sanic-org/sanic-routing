@@ -3,14 +3,14 @@ from logging import getLogger
 
 from .group import RouteGroup
 from .line import Line
-from .patterns import REGEX_PARAM_NAME, REGEX_TYPES
+from .patterns import REGEX_PARAM_NAME
 
 logger = getLogger("sanic.root")
 
 
 class Node:
     def __init__(
-        self, part: str = "", root: bool = False, parent=None
+        self, part: str = "", root: bool = False, parent=None, router=None
     ) -> None:
         self.root = root
         self.part = part
@@ -26,6 +26,7 @@ class Node:
         self.children_basketed = False
         self.children_param_injected = False
         self.has_deferred = False
+        self.router = router
 
     def __str__(self) -> str:
         internals = ", ".join(
@@ -324,8 +325,16 @@ class Node:
                     return True
         return False
 
-    @staticmethod
-    def _sorting(item) -> t.Tuple[bool, int, str, bool, int]:
+    def _has_nested_regex(self, node, recursive=True):
+        if node.group and node.group.regex:
+            return True
+        if recursive and node.children:
+            for child in node.children.values():
+                if self._has_nested_regex(child):
+                    return True
+        return False
+
+    def _sorting(self, item) -> t.Tuple[bool, int, str, bool, int]:
         key, child = item
         type_ = 0
         if child.dynamic:
@@ -333,9 +342,11 @@ class Node:
             if ":" in key:
                 key, param_type = key.split(":", 1)
                 try:
-                    type_ = list(REGEX_TYPES.keys()).index(param_type)
+                    type_ = list(self.router.regex_types.keys()).index(
+                        param_type
+                    )
                 except ValueError:
-                    type_ = len(list(REGEX_TYPES.keys()))
+                    type_ = len(list(self.router.regex_types.keys()))
         return (
             child.dynamic,
             len(child._children),
@@ -346,16 +357,19 @@ class Node:
 
 
 class Tree:
-    def __init__(self) -> None:
-        self.root = Node(root=True)
+    def __init__(self, router) -> None:
+        self.root = Node(root=True, router=router)
         self.root.level = 0
+        self.router = router
 
     def generate(self, groups: t.Iterable[RouteGroup]) -> None:
         for group in groups:
             current = self.root
             for level, part in enumerate(group.parts):
                 if part not in current._children:
-                    current.add_child(Node(part=part, parent=current))
+                    current.add_child(
+                        Node(part=part, parent=current, router=self.router)
+                    )
                 current = current._children[part]
                 current.level = level + 1
 

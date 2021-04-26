@@ -4,7 +4,6 @@ from collections import namedtuple
 from types import SimpleNamespace
 
 from .exceptions import InvalidUsage, ParameterNameConflicts
-from .patterns import REGEX_TYPES
 from .utils import Immutable, parts_to_path, path_to_parts
 
 ParamInfo = namedtuple(
@@ -121,7 +120,12 @@ class Route:
                         )
                     else:
                         self.add_parameter(
-                            idx, part[1:-1], key_path, "string", str, None
+                            idx,
+                            part[1:-1],
+                            key_path,
+                            "string",
+                            str,
+                            self.router.regex_types["string"],
                         )
 
     def add_parameter(
@@ -142,7 +146,12 @@ class Route:
             pattern = re.compile(pattern)
 
         self._params[idx] = ParamInfo(
-            name, raw_path, label, cast, pattern, label not in REGEX_TYPES
+            name,
+            raw_path,
+            label,
+            cast,
+            pattern,
+            label not in self.router.regex_types,
         )
 
     def _finalize_params(self):
@@ -212,15 +221,13 @@ class Route:
     def raw_path(self):
         return self._raw_path
 
-    @staticmethod
-    def _sorting(item) -> int:
+    def _sorting(self, item) -> int:
         try:
-            return list(REGEX_TYPES.keys()).index(item.label)
+            return list(self.router.regex_types.keys()).index(item.label)
         except ValueError:
-            return len(list(REGEX_TYPES.keys()))
+            return len(list(self.router.regex_types.keys()))
 
-    @staticmethod
-    def parse_parameter_string(parameter_string: str):
+    def parse_parameter_string(self, parameter_string: str):
         """Parse a parameter string into its constituent name, type, and
         pattern
 
@@ -246,5 +253,5 @@ class Route:
 
         default = (str, label)
         # Pull from pre-configured types
-        _type, pattern = REGEX_TYPES.get(label, default)
+        _type, pattern = self.router.regex_types.get(label, default)
         return name, label, _type, pattern
