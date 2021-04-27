@@ -325,7 +325,9 @@ class Node:
         return False
 
     @staticmethod
-    def _sorting(item) -> t.Tuple[bool, int, str, bool, int]:
+    def _sorting(
+        item,
+    ) -> t.Tuple[bool, int, bool, int, str]:
         key, child = item
         type_ = 0
         if child.dynamic:
@@ -339,9 +341,9 @@ class Node:
         return (
             child.dynamic,
             len(child._children),
-            key,
             bool(child.group and child.group.regex),
             type_ * -1,
+            key,
         )
 
 
