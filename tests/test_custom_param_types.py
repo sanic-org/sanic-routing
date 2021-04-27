@@ -1,6 +1,7 @@
 import ipaddress
 
 import pytest
+
 from sanic_routing import BaseRouter
 from sanic_routing.exceptions import InvalidUsage
 
