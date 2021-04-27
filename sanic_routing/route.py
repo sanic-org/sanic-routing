@@ -90,11 +90,11 @@ class Route:
             return False
         return bool(
             (
-                self.parts,
+                self.segments,
                 self.requirements,
             )
             == (
-                other.parts,
+                other.segments,
                 other.requirements,
             )
             and (self.methods & other.methods)
@@ -195,6 +195,13 @@ class Route:
             components
         )
 
+    def _part_to_segment(self, part):
+        if not part.startswith("<"):
+            return part
+
+        parsed = self.parse_parameter_string(part)
+        return f"<{parsed[1]}>"
+
     def finalize(self):
         self._finalize_params()
         if self.regex:
@@ -211,6 +218,10 @@ class Route:
     @property
     def raw_path(self):
         return self._raw_path
+
+    @property
+    def segments(self):
+        return tuple([self._part_to_segment(part) for part in self.parts])
 
     @staticmethod
     def _sorting(item) -> int:

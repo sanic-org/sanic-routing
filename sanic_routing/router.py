@@ -174,21 +174,21 @@ class BaseRouter(ABC):
 
         # Catch the scenario where a route is overloaded with and
         # and without requirements, first as dynamic then as static
-        if static and route.parts in self.dynamic_routes:
+        if static and route.segments in self.dynamic_routes:
             routes = self.dynamic_routes
 
         # Catch the reverse scenario where a route is overload first as static
         # and then as dynamic
-        if not static and route.parts in self.static_routes:
-            existing_group = self.static_routes.pop(route.parts)
+        if not static and route.segments in self.static_routes:
+            existing_group = self.static_routes.pop(route.segments)
             group.merge(existing_group, overwrite, append)
 
         else:
-            if route.parts in routes:
-                existing_group = routes[route.parts]
+            if route.segments in routes:
+                existing_group = routes[route.segments]
                 group.merge(existing_group, overwrite, append)
 
-            routes[route.parts] = group
+            routes[route.segments] = group
 
         if name:
             self.name_index[name] = route
