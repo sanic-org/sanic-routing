@@ -209,17 +209,17 @@ class BaseRouter(ABC):
         if not isinstance(label, str):
             raise InvalidUsage(
                 "When registering a pattern, label must be a "
-                f"string, not {label=}"
+                f"string, not label={label}"
             )
         if not callable(cast):
             raise InvalidUsage(
                 "When registering a pattern, cast must be a "
-                f"callable, not {cast=}"
+                f"callable, not cast={cast}"
             )
         if not isinstance(pattern, str):
             raise InvalidUsage(
                 "When registering a pattern, pattern must be a "
-                f"string, not {pattern=}"
+                f"string, not pattern={pattern}"
             )
 
         globals()[cast.__name__] = cast
