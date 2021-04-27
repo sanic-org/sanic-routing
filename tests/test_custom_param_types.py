@@ -1,9 +1,8 @@
 import ipaddress
 
 import pytest
-
 from sanic_routing import BaseRouter
-from sanic_routing.exceptions import InvalidUsage
+from sanic_routing.exceptions import InvalidUsage, NotFound
 
 
 @pytest.fixture
@@ -34,6 +33,21 @@ def test_does_cast(handler):
     retval = handler(**params)
 
     assert isinstance(retval, ipaddress.IPv4Address)
+
+
+def test_does_not_cast(handler):
+    router = Router()
+    router.register_pattern(
+        "ipv4",
+        ipaddress.ip_address,
+        r"^(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$",
+    )
+
+    router.add("/<ip:ipv4>", handler)
+    router.finalize()
+
+    with pytest.raises(NotFound):
+        router.get("/notfound", "BASE")
 
 
 def test_bad_registries():
