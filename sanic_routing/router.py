@@ -4,7 +4,13 @@ from types import SimpleNamespace
 
 from sanic_routing.group import RouteGroup
 
-from .exceptions import BadMethod, FinalizationError, NoMethod, NotFound
+from .exceptions import (
+    BadMethod,
+    FinalizationError,
+    InvalidUsage,
+    NoMethod,
+    NotFound,
+)
 from .line import Line
 from .patterns import REGEX_TYPES
 from .route import Route
@@ -45,11 +51,13 @@ class BaseRouter(ABC):
         self.method_handler_exception = method_handler_exception
         self.route_class = route_class
         self.group_class = group_class
-        self.tree = Tree()
+        self.tree = Tree(router=self)
         self.finalized = False
         self.stacking = stacking
         self.ctx = SimpleNamespace()
         self.cascade_not_found = cascade_not_found
+
+        self.regex_types = {**REGEX_TYPES}
 
     @abstractmethod
     def get(self, **kwargs):
@@ -197,6 +205,26 @@ class BaseRouter(ABC):
 
         return route
 
+    def register_pattern(self, label, cast, pattern):
+        if not isinstance(label, str):
+            raise InvalidUsage(
+                "When registering a pattern, label must be a "
+                f"string, not label={label}"
+            )
+        if not callable(cast):
+            raise InvalidUsage(
+                "When registering a pattern, cast must be a "
+                f"callable, not cast={cast}"
+            )
+        if not isinstance(pattern, str):
+            raise InvalidUsage(
+                "When registering a pattern, pattern must be a "
+                f"string, not pattern={pattern}"
+            )
+
+        globals()[cast.__name__] = cast
+        self.regex_types[label] = (cast, pattern)
+
     def finalize(self, do_compile: bool = True):
         if self.finalized:
             raise FinalizationError("Cannot finalize router more than once.")
@@ -218,7 +246,7 @@ class BaseRouter(ABC):
 
     def reset(self):
         self.finalized = False
-        self.tree = Tree()
+        self.tree = Tree(router=self)
         self._find_route = None
 
         for group in (
@@ -397,7 +425,7 @@ class BaseRouter(ABC):
             return (
                 part.endswith(":path>")
                 or self.delimiter in part
-                or pattern_type not in REGEX_TYPES
+                or pattern_type not in self.regex_types
             )
 
         return any(requires(part) for part in parts)
