@@ -165,6 +165,8 @@ class Node:
                 )
                 if not self.parent.children_param_injected:
                     self.parent.children_param_injected = True
+                if self._has_nested_regex(self):
+                    return_bump += 1
             param_offset = bool(self.group.params)
             return_indent = (
                 indent + return_bump + bool(not self.children) + param_offset
@@ -281,10 +283,16 @@ class Node:
                     Line(f"if num == {self.level}:", indent - 1),
                 ]
             else:
-                lines = [
-                    Line(f"if num > {self.level}:", indent),
-                    Line("raise NotFound", indent + 1),
-                ]
+                if self._has_nested_regex(self):
+                    lines = [
+                        Line(f"if num == {self.level}:", indent),
+                    ]
+                    indent += 1
+                else:
+                    lines = [
+                        Line(f"if num > {self.level}:", indent),
+                        Line("raise NotFound", indent + 1),
+                    ]
         else:
             lines = []
             if first_params:
@@ -320,7 +328,7 @@ class Node:
         ):
             return True
         if recursive and node.children:
-            for child in node.children:
+            for child in node.children.values():
                 if self._has_nested_path(child):
                     return True
         return False

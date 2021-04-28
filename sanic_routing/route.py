@@ -171,7 +171,7 @@ class Route:
         components = []
 
         for part in self.parts:
-            if ":" in part:
+            if part.startswith("<"):
                 name, *_, pattern = self.parse_parameter_string(part)
                 if not isinstance(pattern, str):
                     pattern = pattern.pattern.strip("^$")
