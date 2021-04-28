@@ -121,7 +121,12 @@ class Route:
                         )
                     else:
                         self.add_parameter(
-                            idx, part[1:-1], key_path, "string", str, None
+                            idx,
+                            part[1:-1],
+                            key_path,
+                            "string",
+                            str,
+                            REGEX_TYPES["string"],
                         )
 
     def add_parameter(
@@ -162,7 +167,7 @@ class Route:
         components = []
 
         for part in self.parts:
-            if ":" in part:
+            if part.startswith("<"):
                 name, *_, pattern = self.parse_parameter_string(part)
                 if not isinstance(pattern, str):
                     pattern = pattern.pattern.strip("^$")
