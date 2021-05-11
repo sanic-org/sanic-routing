@@ -1,7 +1,6 @@
 import ast
 import typing as t
 from abc import ABC, abstractmethod
-from ctypes import Union
 from types import SimpleNamespace
 
 from sanic_routing.group import RouteGroup
@@ -335,11 +334,6 @@ class BaseRouter(ABC):
             src += self.tree.render()
 
         for group in self._get_non_static_non_path_groups(True):
-            # route_idx = (
-            #     "route_idx"
-            #     if group.requirements or len(group.routes) > 1
-            #     else 0
-            # )
             route_container = (
                 "regex_routes" if group.regex else "dynamic_routes"
             )
@@ -360,7 +354,8 @@ class BaseRouter(ABC):
                     ),
                     Line(
                         (
-                            f"return router.{route_container}[{group.segments}][0], basket"
+                            f"return router.{route_container}"
+                            f"[{group.segments}][0], basket"
                         ),
                         2,
                     ),
@@ -394,7 +389,6 @@ class BaseRouter(ABC):
                     f"Cannot compile route AST:\n{self.find_route_src_raw}"
                     f"\n{syntax_error}"
                 )
-            # self.optimize(compiled_src.body[0])
             ctx: t.Dict[t.Any, t.Any] = {}
             exec(compiled_src, None, ctx)
             self._find_route = ctx["find_route"]
@@ -423,11 +417,6 @@ class BaseRouter(ABC):
         )
 
     def _optimize(self, node) -> None:
-        """
-        Insert NotFound exceptions to be able to bail as quick as possible,
-        and realign lines to proper indentation
-        """
-
         if hasattr(node, "body"):
             for child in node.body:
                 self._optimize(child)
@@ -438,8 +427,8 @@ class BaseRouter(ABC):
             #          if num > 3:
             # BECOMES:
             #       if parts[1] == 'foo' and num > 3:
-            # Testing has shown that further recursion does not actually produce
-            # any faster results.
+            # Testing has shown that further recursion does not actually
+            # produce any faster results.
             # if self._is_lone_if(node) and self._is_lone_if(node.body[0]):
             #     current = node.body[0]
             #     nested = node.body[0].body[0]

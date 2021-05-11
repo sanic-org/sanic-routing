@@ -1,5 +1,4 @@
 import typing as t
-from email.utils import unquote
 from logging import getLogger
 
 from .group import RouteGroup
@@ -105,10 +104,9 @@ class Node:
                 child.apply_offset(amt, apply_children=True)
 
     def to_src(self) -> t.Tuple[t.List[Line], t.List[Line], t.List[Line]]:
-        # indent = (self.level + 1) * 2 - 3 + self.offset
         siblings = self.parent.children if self.parent else {}
-        prev_node: t.Optional[Node] = None
-        next_node: t.Optional[Node] = None
+        # prev_node: t.Optional[Node] = None
+        # next_node: t.Optional[Node] = None
         current: t.Optional[Node] = None
         first_sibling: t.Optional[Node] = None
 
@@ -117,26 +115,16 @@ class Node:
 
         for child in siblings.values():
             if current is self:
-                next_node = child
+                # next_node = child
                 break
-            prev_node = current
+            # prev_node = current
             current = child
-
-        # if self.parent:
-        #     self.base_indent = (
-        #         self.parent.base_indent
-        #         # + (not self.parent.dynamic)
-        #         # + bool(self.parent.groups)
-        #     )
 
         self.base_indent = (
             bool(self.level >= 1 or self.first) + self.parent.base_indent
             if self.parent
             else 0
         )
-
-        # if not self.first and self.groups:
-        #     self.base_indent += 1
 
         indent = self.base_indent
         delayed: t.List[Line] = []
@@ -145,29 +133,17 @@ class Node:
 
         src.append(Line("", indent))
         src.append(Line(f"# node={self.ident} // part={self.part}", indent))
-        # src.append(
-        #     Line(
-        #         f"# indent={self.base_indent} // parent={self.parent.base_indent}",
-        #         indent,
-        #     )
-        # )
+
         level = self.level
         idx = level - 1
 
         return_bump = not self.dynamic
 
-        # if self.first:
-        # operation = ">"
         operation = ">"
         conditional = "if"
 
         if self.groups:
-            operation = (
-                "=="
-                if self.level == self.parent.depth
-                # and not self._has_nested_path(self)
-                else ">="
-            )
+            operation = "==" if self.level == self.parent.depth else ">="
             self.equality_check = operation == "=="
 
         src.append(
@@ -177,39 +153,8 @@ class Node:
             )
         )
         indent += 1
-        # elif (
-        #     self.last
-        #     and self.groups
-        #     and all(not group.requirements for group in self.groups)
-        # ):
-        #     if prev_node and prev_node.groups:
-        #         ...
-        #     else:
-        #         operation = (
-        #             ">"
-        #             if any(
-        #                 group.depth > self.level
-        #                 for child in self.children.values()
-        #                 for group in child.groups
-        #             )
-        #             else "=="
-        #         )
-        #         self.equality_check = operation == "=="
-        #         src.append(
-        #             Line(f"if num {operation} {level}:  # CHECK 2", indent)
-        #         )
-        #     if not (prev_node and prev_node.groups):
-        #         indent += 1
 
         if self.dynamic:
-            # if not self.parent.children_basketed:
-            #     self.parent.children_basketed = True
-            #     #         if not self.groups:
-            #     #             src.append(Line(f"if num > {level}:  # CHECK 3", indent))
-            #     #             self.base_indent += 1
-            #     #             indent += 1
-            #     src.append(Line(f"basket[{idx}] = parts[{idx}]", indent))
-            # src.append(Line(f"basket[{idx}] = parts[{idx}]", indent))
             self._inject_param_check(src, indent, idx)
             indent += 1
 
@@ -233,7 +178,8 @@ class Node:
 
             src.append(
                 Line(
-                    f'{if_stmt} parts[{idx}] == "{self.part}"{len_check}:  # CHECK 4',
+                    f'{if_stmt} parts[{idx}] == "{self.part}"{len_check}:'
+                    "  # CHECK 4",
                     indent,
                 )
             )
@@ -246,7 +192,6 @@ class Node:
 
             if not self.equality_check:
                 conditional = "elif" if self.children else "if"
-                # operation = "==" if not self._has_nested_path(self) else ">="
                 operation = "=="
                 location.append(
                     Line(
@@ -280,7 +225,6 @@ class Node:
                 self._inject_return(
                     location, return_indent + group_bump, route_idx, group
                 )
-        # self.base_indent += 1
 
         return src, delayed, final
 
@@ -298,7 +242,6 @@ class Node:
         lines = [
             Line("try:", indent),
             Line(
-                # f"basket['__params__']['{self.param.name}'] = "
                 f"basket['__matches__'][{idx}] = "
                 f"{unquote_start}{self.param.cast.__name__}(parts[{idx}])"
                 f"{unquote_end}",
@@ -309,9 +252,6 @@ class Node:
             Line("else:", indent),
         ]
         self.base_indent += 1
-        # for idx, param in group.params.items():
-        #     lines.append(
-        #     )
 
         location.extend(lines)
 
@@ -391,52 +331,7 @@ class Node:
             ]
         )
 
-    # def _inject_params(self, location, indent, group):
-    #     lines = []
-    #     lines.append(Line("try:", indent))
-    #     for idx, param in group.params.items():
-    #         unquote_start = "unquote(" if group.unquote else ""
-    #         unquote_end = ")" if group.unquote else ""
-    #         lines.append(
-    #             Line(
-    #                 f"basket['__params__']['{param.name}'] = "
-    #                 f"{unquote_start}{param.cast.__name__}(basket[{idx}])"
-    #                 f"{unquote_end}",
-    #                 indent + 1,
-    #             )
-    #         )
-
-    #     location.extend(
-    #         lines
-    #         + [
-    #             # Line("except (ValueError, KeyError):", indent),
-    #             Line("except ValueError:", indent),
-    #             Line("pass", indent + 1),
-    #             Line("else:", indent),
-    #         ]
-    #     )
-
-    # def _has_nested_path(self, node, recursive=True):
-    #     if node.param and (
-    #         (node.param.label == "path") or (r"/" in node.param.label)
-    #     ):
-    #         return True
-    #     if recursive and node.children:
-    #         for child in node.children.values():
-    #             if self._has_nested_path(child):
-    #                 return True
-    #     return False
-
-    # def _has_nested_regex(self, node, recursive=True):
-    #     if node.group and node.group.regex:
-    #         return True
-    #     if recursive and node.children:
-    #         for child in node.children.values():
-    #             if self._has_nested_regex(child):
-    #                 return True
-    #     return False
-
-    def _sorting(self, item) -> t.Tuple[bool, int, str, bool, int]:
+    def _sorting(self, item) -> t.Tuple[bool, bool, int, int, int, bool, str]:
         key, child = item
         type_ = 0
         if child.dynamic:
