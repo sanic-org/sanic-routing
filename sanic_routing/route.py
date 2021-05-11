@@ -63,7 +63,9 @@ class Route:
         self._params: t.Dict[int, ParamInfo] = {}
         self._raw_path = raw_path
 
-        parts = path_to_parts(raw_path, self.router.delimiter)
+        ingested_path = self._ingest_path(raw_path)
+
+        parts = path_to_parts(ingested_path, self.router.delimiter)
         self.path = parts_to_path(parts, delimiter=self.router.delimiter)
         self.parts = parts
         self.static = static
@@ -99,6 +101,15 @@ class Route:
             and (self.methods & other.methods)
         )
 
+    def _ingest_path(self, path):
+        segments = []
+        for part in path.split(self.router.delimiter):
+            if "<" in part and ":" not in part:
+                name = part[1:-1]
+                part = f"<{name}:string>"
+            segments.append(part)
+        return self.router.delimiter.join(segments)
+
     def _setup_params(self):
         key_path = parts_to_path(
             path_to_parts(self.raw_path, self.router.delimiter),
@@ -108,25 +119,15 @@ class Route:
             parts = path_to_parts(key_path, self.router.delimiter)
             for idx, part in enumerate(parts):
                 if "<" in part:
-                    if ":" in part:
-                        (
-                            name,
-                            label,
-                            _type,
-                            pattern,
-                        ) = self.parse_parameter_string(part[1:-1])
-                        self.add_parameter(
-                            idx, name, key_path, label, _type, pattern
-                        )
-                    else:
-                        self.add_parameter(
-                            idx,
-                            part[1:-1],
-                            key_path,
-                            "string",
-                            str,
-                            self.router.regex_types["string"],
-                        )
+                    (
+                        name,
+                        label,
+                        _type,
+                        pattern,
+                    ) = self.parse_parameter_string(part[1:-1])
+                    self.add_parameter(
+                        idx, name, key_path, label, _type, pattern
+                    )
 
     def add_parameter(
         self,
@@ -220,6 +221,10 @@ class Route:
     @property
     def raw_path(self):
         return self._raw_path
+
+    @property
+    def uri(self):
+        return f"/{self.path}"
 
     def _sorting(self, item) -> int:
         try:

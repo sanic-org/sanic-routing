@@ -25,6 +25,9 @@ class RouteGroup:
         )
         return f"<{self.__class__.__name__}: {display}>"
 
+    def __repr__(self) -> str:
+        return str(self)
+
     def __iter__(self):
         return iter(self.routes)
 
@@ -66,6 +69,10 @@ class RouteGroup:
                 else:
                     _routes.append(other_route)
         self._routes = tuple(_routes)
+
+    @property
+    def depth(self):
+        return len(self[0].parts)
 
     @property
     def labels(self):
@@ -120,3 +127,7 @@ class RouteGroup:
     @property
     def unquote(self):
         return self[0].unquote
+
+    @property
+    def uri(self):
+        return self[0].uri

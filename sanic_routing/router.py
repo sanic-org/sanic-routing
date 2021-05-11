@@ -372,40 +372,40 @@ class BaseRouter(ABC):
         Insert NotFound exceptions to be able to bail as quick as possible,
         and realign lines to proper indentation
         """
-        offset = 0
-        current = 0
-        insert_at = set()
-        for num, line in enumerate(src):
-            if line.indent < current:
-                if not line.src.startswith("."):
-                    if offset < 0:
-                        offset += 1
-                    else:
-                        offset = 0
+        # offset = 0
+        # current = 0
+        # insert_at = set()
+        # for num, line in enumerate(src):
+        #     if line.indent < current:
+        #         if not line.src.startswith("."):
+        #             if offset < 0:
+        #                 offset += 1
+        #             else:
+        #                 offset = 0
 
-            if (
-                line.src.startswith("if")
-                or line.src.startswith("elif")
-                or line.src.startswith("return")
-                or line.src.startswith("basket")
-                or line.src.startswith("try")
-            ):
+        #     if (
+        #         line.src.startswith("if")
+        #         or line.src.startswith("elif")
+        #         or line.src.startswith("return")
+        #         or line.src.startswith("basket")
+        #         or line.src.startswith("try")
+        #     ):
 
-                idnt = line.indent + 1
-                prev_line = src[num - 1]
-                while idnt < prev_line.indent:
-                    insert_at.add((num, idnt))
-                    idnt += 1
+        #         idnt = line.indent + 1
+        #         prev_line = src[num - 1]
+        #         while idnt < prev_line.indent:
+        #             insert_at.add((num, idnt))
+        #             idnt += 1
 
-            offset += line.offset
-            line.indent += offset
-            current = line.indent
+        #     offset += line.offset
+        #     line.indent += offset
+        #     current = line.indent
 
-        idnt = 1
-        prev_line = src[-1]
-        while idnt < prev_line.indent:
-            insert_at.add((len(src), idnt))
-            idnt += 1
+        # idnt = 1
+        # prev_line = src[-1]
+        # while idnt < prev_line.indent:
+        #     insert_at.add((len(src), idnt))
+        #     idnt += 1
 
         if self.cascade_not_found:
             for num, indent in sorted(
