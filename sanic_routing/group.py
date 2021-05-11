@@ -75,6 +75,13 @@ class RouteGroup:
         return len(self[0].parts)
 
     @property
+    def dynamic_path(self):
+        return any(
+            (param.label == "path") or (r"/" in param.label)
+            for param in self.params.values()
+        )
+
+    @property
     def labels(self):
         return self[0].labels
 
@@ -119,6 +126,10 @@ class RouteGroup:
     @property
     def router(self):
         return self[0].router
+
+    @property
+    def segments(self):
+        return self[0].segments
 
     @property
     def strict(self):

@@ -7,7 +7,8 @@ from .exceptions import InvalidUsage, ParameterNameConflicts
 from .utils import Immutable, parts_to_path, path_to_parts
 
 ParamInfo = namedtuple(
-    "ParamInfo", ("name", "raw_path", "label", "cast", "pattern", "regex")
+    "ParamInfo",
+    ("name", "raw_path", "label", "cast", "pattern", "regex", "priority"),
 )
 
 
@@ -89,13 +90,14 @@ class Route:
     def __eq__(self, other) -> bool:
         if not isinstance(other, self.__class__):
             return False
+
         return bool(
             (
-                self.parts,
+                self.segments,
                 self.requirements,
             )
             == (
-                other.parts,
+                other.segments,
                 other.requirements,
             )
             and (self.methods & other.methods)
@@ -153,6 +155,9 @@ class Route:
             cast,
             pattern,
             label not in self.router.regex_types,
+            list(self.router.regex_types.keys()).index(label)
+            if label in self.router.regex_types
+            else 0,
         )
 
     def _finalize_params(self):
@@ -221,6 +226,17 @@ class Route:
     @property
     def raw_path(self):
         return self._raw_path
+
+    @property
+    def segments(self):
+        return tuple(
+            [
+                f"<__dynamic__:{self._params[idx].label}>"
+                if self._params.get(idx)
+                else segment
+                for idx, segment in enumerate(self.parts)
+            ]
+        )
 
     @property
     def uri(self):

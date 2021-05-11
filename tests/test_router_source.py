@@ -1,5 +1,4 @@
 import pytest
-
 from sanic_routing import BaseRouter
 
 
@@ -11,8 +10,8 @@ class Router(BaseRouter):
 @pytest.mark.parametrize(
     "cascade,lines,not_founds",
     (
-        (True, 32, 8),
-        (False, 28, 4),
+        (True, 25, 1),
+        (False, 25, 1),
     ),
 )
 def test_route_correct_coercion(cascade, lines, not_founds):

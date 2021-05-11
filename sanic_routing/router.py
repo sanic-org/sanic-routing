@@ -1,5 +1,7 @@
+import ast
 import typing as t
 from abc import ABC, abstractmethod
+from ctypes import Union
 from types import SimpleNamespace
 
 from sanic_routing.group import RouteGroup
@@ -73,7 +75,11 @@ class BaseRouter(ABC):
     ):
         try:
             route, param_basket = self.find_route(
-                path, method, self, {"__params__": {}}, extra
+                path,
+                method,
+                self,
+                {"__params__": {}, "__matches__": {}},
+                extra,
             )
         except (NotFound, NoMethod) as e:
             if path.endswith(self.delimiter):
@@ -95,7 +101,12 @@ class BaseRouter(ABC):
                     allowed_methods=route.methods,
                 )
 
-        params = param_basket.pop("__params__")
+        params = param_basket["__params__"]
+        if not params:
+            params = {
+                param.name: param_basket["__matches__"][idx]
+                for idx, param in route.params.items()
+            }
 
         if route.strict and orig and orig[-1] != route.path[-1]:
             raise self.exception("Path not found", path=path)
@@ -182,21 +193,21 @@ class BaseRouter(ABC):
 
         # Catch the scenario where a route is overloaded with and
         # and without requirements, first as dynamic then as static
-        if static and route.parts in self.dynamic_routes:
+        if static and route.segments in self.dynamic_routes:
             routes = self.dynamic_routes
 
         # Catch the reverse scenario where a route is overload first as static
         # and then as dynamic
-        if not static and route.parts in self.static_routes:
-            existing_group = self.static_routes.pop(route.parts)
+        if not static and route.segments in self.static_routes:
+            existing_group = self.static_routes.pop(route.segments)
             group.merge(existing_group, overwrite, append)
 
         else:
-            if route.parts in routes:
-                existing_group = routes[route.parts]
+            if route.segments in routes:
+                existing_group = routes[route.segments]
                 group.merge(existing_group, overwrite, append)
 
-            routes[route.parts] = group
+            routes[route.segments] = group
 
         if name:
             self.name_index[name] = route
@@ -225,7 +236,7 @@ class BaseRouter(ABC):
         globals()[cast.__name__] = cast
         self.regex_types[label] = (cast, pattern)
 
-    def finalize(self, do_compile: bool = True):
+    def finalize(self, do_compile: bool = True, do_optimize: bool = True):
         if self.finalized:
             raise FinalizationError("Cannot finalize router more than once.")
         if not self.routes:
@@ -242,7 +253,7 @@ class BaseRouter(ABC):
                 route.finalize()
 
         self._generate_tree()
-        self._render(do_compile)
+        self._render(do_compile, do_optimize)
 
     def reset(self):
         self.finalized = False
@@ -258,14 +269,21 @@ class BaseRouter(ABC):
             for route in group.routes:
                 route.reset()
 
-    def _generate_tree(self) -> None:
-        self.tree.generate(
-            list(self.dynamic_routes.values())
+    def _get_non_static_non_path_groups(self, has_dynamic_path: bool):
+        return [
+            group
+            for group in list(self.dynamic_routes.values())
             + list(self.regex_routes.values())
-        )
+            if group.dynamic_path is has_dynamic_path
+        ]
+
+    def _generate_tree(self) -> None:
+        self.tree.generate(self._get_non_static_non_path_groups(False))
         self.tree.finalize()
 
-    def _render(self, do_compile: bool = True) -> None:
+    def _render(
+        self, do_compile: bool = True, do_optimize: bool = True
+    ) -> None:
         src = [
             Line("def find_route(path, method, router, basket, extra):", 0),
             Line("parts = tuple(path[1:].split(router.delimiter))", 1),
@@ -316,16 +334,52 @@ class BaseRouter(ABC):
             src += [Line("num = len(parts)", 1)]
             src += self.tree.render()
 
+        for group in self._get_non_static_non_path_groups(True):
+            # route_idx = (
+            #     "route_idx"
+            #     if group.requirements or len(group.routes) > 1
+            #     else 0
+            # )
+            route_container = (
+                "regex_routes" if group.regex else "dynamic_routes"
+            )
+
+            src.extend(
+                [
+                    Line(
+                        (
+                            "match = router.matchers"
+                            f"[{group.pattern_idx}].match(path)"
+                        ),
+                        1,
+                    ),
+                    Line("if match:", 1),
+                    Line(
+                        "basket['__params__'] = match.groupdict()",
+                        2,
+                    ),
+                    Line(
+                        (
+                            f"return router.{route_container}[{group.segments}][0], basket"
+                        ),
+                        2,
+                    ),
+                ]
+            )
+
         src.append(Line("raise NotFound", 1))
         src.extend(delayed)
 
-        self.optimize(src)
-
-        self.find_route_src = "".join(
+        self.find_route_src_raw = "".join(
             map(str, filter(lambda x: x.render, src))
         )
         if do_compile:
             try:
+                syntax_tree = ast.parse(self.find_route_src_raw)
+
+                if do_optimize:
+                    self._optimize(syntax_tree.body[0])
+                self.find_route_src = ast.unparse(syntax_tree)
                 compiled_src = compile(
                     self.find_route_src,
                     "",
@@ -337,9 +391,10 @@ class BaseRouter(ABC):
                     f"{' '*max(0,int(se.offset or 0)-1) + '^'}"
                 )
                 raise FinalizationError(
-                    f"Cannot compile route AST:\n{self.find_route_src}"
+                    f"Cannot compile route AST:\n{self.find_route_src_raw}"
                     f"\n{syntax_error}"
                 )
+            # self.optimize(compiled_src.body[0])
             ctx: t.Dict[t.Any, t.Any] = {}
             exec(compiled_src, None, ctx)
             self._find_route = ctx["find_route"]
@@ -367,51 +422,69 @@ class BaseRouter(ABC):
             [route for group in self.groups.values() for route in group]
         )
 
-    def optimize(self, src: t.List[Line]) -> None:
+    def _optimize(self, node) -> None:
         """
         Insert NotFound exceptions to be able to bail as quick as possible,
         and realign lines to proper indentation
         """
-        # offset = 0
-        # current = 0
-        # insert_at = set()
-        # for num, line in enumerate(src):
-        #     if line.indent < current:
-        #         if not line.src.startswith("."):
-        #             if offset < 0:
-        #                 offset += 1
-        #             else:
-        #                 offset = 0
 
-        #     if (
-        #         line.src.startswith("if")
-        #         or line.src.startswith("elif")
-        #         or line.src.startswith("return")
-        #         or line.src.startswith("basket")
-        #         or line.src.startswith("try")
-        #     ):
+        if hasattr(node, "body"):
+            for child in node.body:
+                self._optimize(child)
 
-        #         idnt = line.indent + 1
-        #         prev_line = src[num - 1]
-        #         while idnt < prev_line.indent:
-        #             insert_at.add((num, idnt))
-        #             idnt += 1
+            # concatenate nested single if blocks
+            # EXAMPLE:
+            #      if parts[1] == "foo":
+            #          if num > 3:
+            # BECOMES:
+            #       if parts[1] == 'foo' and num > 3:
+            # Testing has shown that further recursion does not actually produce
+            # any faster results.
+            # if self._is_lone_if(node) and self._is_lone_if(node.body[0]):
+            #     current = node.body[0]
+            #     nested = node.body[0].body[0]
 
-        #     offset += line.offset
-        #     line.indent += offset
-        #     current = line.indent
+            #     values: t.List[t.Any] = []
+            #     for test in [current.test, nested.test]:
+            #         if isinstance(test, ast.Compare):
+            #             values.append(test)
+            #         elif isinstance(test, ast.BoolOp) and isinstance(
+            #             test.op, ast.And
+            #         ):
+            #             values.extend(test.values)
+            #     combined = ast.BoolOp(op=ast.And(), values=values)
 
-        # idnt = 1
-        # prev_line = src[-1]
-        # while idnt < prev_line.indent:
-        #     insert_at.add((len(src), idnt))
-        #     idnt += 1
+            #     current.test = combined
+            #     current.body = nested.body
 
-        if self.cascade_not_found:
-            for num, indent in sorted(
-                insert_at, key=lambda x: (x[0] * -1, x[1])
-            ):
-                src.insert(num, Line("raise NotFound", indent))
+            # Look for identical successive if blocks
+            # EXAMPLE:
+            #       if num == 5:
+            #           foo1()
+            #       if num == 5:
+            #           foo2()
+            # BECOMES:
+            #       if num == 5:
+            #           foo1()
+            #           foo2()
+            # if (
+            #     all(isinstance(child, ast.If) for child in node.body)
+            #     and len({child.test for child in node.body})
+            #     and len(node.body) > 1
+            # ):
+            #     first, *rem = node.body
+            #     for item in rem:
+            #         first.body.extend(item.body)
+
+            #     node.body = [first]
+
+        if hasattr(node, "orelse"):
+            for child in node.orelse:
+                self._optimize(child)
+
+    @staticmethod
+    def _is_lone_if(node):
+        return len(node.body) == 1 and isinstance(node.body[0], ast.If)
 
     def _is_regex(self, path: str):
         parts = path_to_parts(path, self.delimiter)

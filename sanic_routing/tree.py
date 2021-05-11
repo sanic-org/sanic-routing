@@ -1,4 +1,5 @@
 import typing as t
+from email.utils import unquote
 from logging import getLogger
 
 from .group import RouteGroup
@@ -10,11 +11,17 @@ logger = getLogger("sanic.root")
 
 class Node:
     def __init__(
-        self, part: str = "", root: bool = False, parent=None, router=None
+        self,
+        part: str = "",
+        root: bool = False,
+        parent=None,
+        router=None,
+        param=None,
     ) -> None:
         self.root = root
         self.part = part
         self.parent = parent
+        self.param = param
         self._children: t.Dict[str, "Node"] = {}
         self.children: t.Dict[str, "Node"] = {}
         self.level = 0
@@ -28,6 +35,7 @@ class Node:
         self.children_param_injected = False
         self.has_deferred = False
         self.equality_check = False
+        self.unquote = False
         self.router = router
 
     def __str__(self) -> str:
@@ -40,6 +48,21 @@ class Node:
 
     def __repr__(self) -> str:
         return str(self)
+
+    @property
+    def ident(self) -> str:
+        prefix = (
+            f"{self.parent.ident}."
+            if self.parent and not self.parent.root
+            else ""
+        )
+        return f"{prefix}{self.idx}"
+
+    @property
+    def idx(self) -> int:
+        if not self.parent:
+            return 1
+        return list(self.parent.children.keys()).index(self.part) + 1
 
     def finalize_children(self):
         self.children = {
@@ -99,17 +122,21 @@ class Node:
             prev_node = current
             current = child
 
-        if self.parent:
-            self.base_indent = (
-                self.parent.base_indent
-                + (not self.parent.dynamic)
-                + bool(self.parent.groups)
-            )
+        # if self.parent:
+        #     self.base_indent = (
+        #         self.parent.base_indent
+        #         # + (not self.parent.dynamic)
+        #         # + bool(self.parent.groups)
+        #     )
 
-        if not self.first and self.groups:
-            # self.base_indent += bool(prev_node and prev_node.group)
-            # self.base_indent += bool(prev_node)
-            self.base_indent += 1
+        self.base_indent = (
+            bool(self.level >= 1 or self.first) + self.parent.base_indent
+            if self.parent
+            else 0
+        )
+
+        # if not self.first and self.groups:
+        #     self.base_indent += 1
 
         indent = self.base_indent
         delayed: t.List[Line] = []
@@ -117,126 +144,75 @@ class Node:
         src: t.List[Line] = []
 
         src.append(Line("", indent))
-        src.append(Line(f"# {self}", indent))
-        src.append(
-            Line(
-                f"# indent={self.base_indent} // parent={self.parent.base_indent}",
-                indent,
-            )
-        )
+        src.append(Line(f"# node={self.ident} // part={self.part}", indent))
+        # src.append(
+        #     Line(
+        #         f"# indent={self.base_indent} // parent={self.parent.base_indent}",
+        #         indent,
+        #     )
+        # )
         level = self.level
         idx = level - 1
 
-        # len_check = ""
         return_bump = not self.dynamic
 
         # if self.first:
-        #     if level == 0:
-        #         if self.group:
-        #             src.append(Line("if True:", indent))
-        #         else:
-        #             src.append(Line("if parts[0]:", indent))
-        #     else:
-        #         operation = ">"
-        #         use_level = level
-        #         conditional = "if"
-        #         if (
-        #             self.last
-        #             and self.group
-        #             and not self.children
-        #             and not self.group.requirements
-        #         ):
-        #             use_level = self.level
-        #             operation = "=="
-        #             equality_check = True
-        #             conditional = "elif"
-        #             src.extend(
-        #                 [
-        #                     Line(f"if num > {use_level}:", indent),
-        #                     Line("...", indent + 1)
-        #                     if self._has_nested_path(self)
-        #                     else Line("raise NotFound", indent + 1),
-        #                 ]
-        #             )
-        #         src.append(
-        #             Line(f"{conditional} num {operation} {use_level}:", indent)
-        #         )
+        # operation = ">"
+        operation = ">"
+        conditional = "if"
 
-        if self.first:
-            # operation = ">"
-            operation = ">="
-            conditional = "if"
-
-            # raise Exception([sibling.depth for sibling in siblings.values()])
-            if self.groups:
-                operation = "==" if self.level == self.parent.depth else ">="
-                self.equality_check = operation == "=="
-
-            # if self.last and self.group and not self.group.requirements:
-            #     equality_check = True
-            #     operation = "=="
-            #     conditional = "elif"
-            #     src.extend(
-            #         [
-            #             Line(f"if num > {level}:", indent),
-            #             # Line("...", indent + 1)
-            #             # if self._has_nested_path(self)
-            #             # else Line("raise NotFound", indent + 1),
-            #             Line("raise NotFound", indent + 1),
-            #         ]
-            #     )
-            src.append(
-                Line(
-                    f"{conditional} num {operation} {level}:  # CHECK 1",
-                    indent,
-                )
+        if self.groups:
+            operation = (
+                "=="
+                if self.level == self.parent.depth
+                # and not self._has_nested_path(self)
+                else ">="
             )
-            indent += 1
-        elif (
-            self.last
-            and self.groups
-            and all(not group.requirements for group in self.groups)
-        ):
-            if prev_node and prev_node.groups:
-                ...
-            else:
-                operation = (
-                    ">="
-                    if any(
-                        group.depth > self.level
-                        for child in self.children.values()
-                        for group in child.groups
-                    )
-                    else "=="
-                )
-                self.equality_check = operation == "=="
-                src.append(
-                    Line(f"if num {operation} {level}:  # CHECK 2", indent)
-                )
-            # delayed.extend(
-            #     [
-            #         Line(f"else:", indent),
-            #         # Line("...", indent + 1)
-            #         # if self._has_nested_path(self)
-            #         # else Line("raise NotFound", indent + 1),
-            #         Line("raise NotFound", indent + 1),
-            #     ]
-            # )
-            if not (prev_node and prev_node.groups):
-                indent += 1
+            self.equality_check = operation == "=="
+
+        src.append(
+            Line(
+                f"{conditional} num {operation} {level}:  # CHECK 1",
+                indent,
+            )
+        )
+        indent += 1
+        # elif (
+        #     self.last
+        #     and self.groups
+        #     and all(not group.requirements for group in self.groups)
+        # ):
+        #     if prev_node and prev_node.groups:
+        #         ...
+        #     else:
+        #         operation = (
+        #             ">"
+        #             if any(
+        #                 group.depth > self.level
+        #                 for child in self.children.values()
+        #                 for group in child.groups
+        #             )
+        #             else "=="
+        #         )
+        #         self.equality_check = operation == "=="
+        #         src.append(
+        #             Line(f"if num {operation} {level}:  # CHECK 2", indent)
+        #         )
+        #     if not (prev_node and prev_node.groups):
+        #         indent += 1
 
         if self.dynamic:
-            if not self.parent.children_basketed:
-                self.parent.children_basketed = True
-                if not self.groups:
-                    src.append(Line(f"if num > {level}:  # CHECK 3", indent))
-                    self.base_indent += 1
-                    indent += 1
-                src.append(Line(f"basket[{idx}] = parts[{idx}]", indent))
-                # self.parent.apply_offset(-1, False, True)
+            # if not self.parent.children_basketed:
+            #     self.parent.children_basketed = True
+            #     #         if not self.groups:
+            #     #             src.append(Line(f"if num > {level}:  # CHECK 3", indent))
+            #     #             self.base_indent += 1
+            #     #             indent += 1
+            #     src.append(Line(f"basket[{idx}] = parts[{idx}]", indent))
+            # src.append(Line(f"basket[{idx}] = parts[{idx}]", indent))
+            self._inject_param_check(src, indent, idx)
+            indent += 1
 
-                # if not self.children:
-                #     return_bump -= 1
         else:
             if (
                 not self.equality_check
@@ -245,135 +221,36 @@ class Node:
                 and first_sibling
             ):
                 self.equality_check = first_sibling.equality_check
-            # if_stmt = (
-            #     "if"
-            #     if self.first or (first_sibling and not first_sibling.group)
-            #     else "elif"
-            # )
+
             if_stmt = "if"
             len_check = (
                 f" and num == {self.level}"
                 if not self.children and not self.equality_check
                 else ""
             )
-            if len_check:
-                self.equality_check = True
+
+            self.equality_check = self.equality_check or bool(len_check)
+
             src.append(
                 Line(
                     f'{if_stmt} parts[{idx}] == "{self.part}"{len_check}:  # CHECK 4',
                     indent,
                 )
             )
-            # if self.children:
-            #     return_bump += 1
+            self.base_indent += 1
 
-        # if self.dynamic:
-        #     if not self.parent.children_basketed:
-        #         self.parent.children_basketed = True
-        #         src.append(
-        #             Line(f"basket[{level}] = parts[{level}]", indent + 1)
-        #         )
-        #         self.parent.apply_offset(-1, False, True)
-
-        #         if not self.children:
-        #             return_bump -= 1
-        # else:
-        #     if_stmt = "if" if self.first or self.root else "elif"
-        #     len_check = (
-        #         f" and num == {self.level}"
-        #         if not self.children and not equality_check
-        #         else ""
-        #     )
-        #     src.append(
-        #         Line(
-        #             f'{if_stmt} parts[{level}] == "{self.part}"{len_check}:',
-        #             indent + 1,
-        #         )
-        #     )
-        #     if self.children:
-        #         return_bump += 1
-
-        # if self.group:
-        #     location = delayed if self.children else src
-        #     route_idx: t.Union[int, str] = 0
-        #     if self.group.requirements:
-        #         route_idx = "route_idx"
-        #         self._inject_requirements(
-        #             location, indent + return_bump + bool(not self.children)
-        #         )
-        #     if self.group.params and not self.group.regex:
-        #         if not self.last:
-        #             return_bump += 1
-        #         if self.parent.has_deferred:
-        #             return_bump += 1
-        #         self._inject_params(
-        #             location,
-        #             indent + return_bump + bool(not self.children),
-        #             not self.parent.children_param_injected,
-        #         )
-        #         if not self.parent.children_param_injected:
-        #             self.parent.children_param_injected = True
-        #         if self._has_nested_regex(self):
-        #             return_bump += 1
-        #     param_offset = bool(self.group.params)
-        #     return_indent = (
-        #         indent + return_bump + bool(not self.children) + param_offset
-        #     )
-        #     if self.group.regex:
-        #         if self._has_nested_path(self, recursive=False):
-        #             location.append(Line("...", return_indent - 1))
-        #             return_indent = 2
-        #             location = final
-        #             self._mark_parents_defer(self.parent)
-        #         self._inject_regex(
-        #             location,
-        #             return_indent,
-        #             not self.parent.children_param_injected,
-        #         )
-        #     if route_idx == 0 and len(self.group.routes) > 1:
-        #         route_idx = "route_idx"
-        #         for i, route in enumerate(self.group.routes):
-        #             if_stmt = "if" if i == 0 else "elif"
-        #             location.extend(
-        #                 [
-        #                     Line(
-        #                         f"{if_stmt} method in {route.methods}:",
-        #                         return_indent,
-        #                     ),
-        #                     Line(f"route_idx = {i}", return_indent + 1),
-        #                 ]
-        #             )
-        #         location.extend(
-        #             [
-        #                 Line("else:", return_indent),
-        #                 Line("raise NoMethod", return_indent + 1),
-        #             ]
-        #         )
-        #     routes = "regex_routes" if self.group.regex else "dynamic_routes"
-        #     route_return = (
-        #         "" if self.group.router.stacking else f"[{route_idx}]"
-        #     )
-        #     location.extend(
-        #         [
-        #             Line(
-        #                 (
-        #                     f"return router.{routes}[{self.group.parts}]"
-        #                     f"{route_return}, basket"
-        #                 ),
-        #                 return_indent,
-        #             ),
-        #         ]
-        #     )
         if self.groups:
-            location = delayed if self.children else src
             return_indent = indent + return_bump
             route_idx: t.Union[int, str] = 0
+            location = delayed
 
             if not self.equality_check:
                 conditional = "elif" if self.children else "if"
+                # operation = "==" if not self._has_nested_path(self) else ">="
+                operation = "=="
                 location.append(
                     Line(
-                        f"{conditional} num == {level}:  # CHECK 5",
+                        f"{conditional} num {operation} {level}:  # CHECK 5",
                         return_indent,
                     )
                 )
@@ -389,19 +266,11 @@ class Node:
                     )
 
                 if group.regex:
-                    self._inject_regex(src, return_indent + group_bump, group)
+                    self._inject_regex(
+                        location, return_indent + group_bump, group
+                    )
                     group_bump += 1
 
-                else:
-                    if group.params:
-                        self._inject_params(
-                            location,
-                            return_indent + group_bump,
-                            group
-                            # indent + return_bump + bool(not self.children),
-                            # not self.parent.children_param_injected,
-                        )
-                        group_bump += 1
                 if route_idx == 0 and len(group.routes) > 1:
                     route_idx = "route_idx"
                     self._inject_method_check(
@@ -411,9 +280,7 @@ class Node:
                 self._inject_return(
                     location, return_indent + group_bump, route_idx, group
                 )
-        else:
-            # self.base_indent += bool(self.level > 1 or self.first)
-            self.base_indent += bool(self.level > 1 or self.first)
+        # self.base_indent += 1
 
         return src, delayed, final
 
@@ -424,6 +291,29 @@ class Node:
         parent.has_deferred = True
         if getattr(parent, "parent", None):
             self._mark_parents_defer(parent.parent)
+
+    def _inject_param_check(self, location, indent, idx):
+        unquote_start = "unquote(" if self.unquote else ""
+        unquote_end = ")" if self.unquote else ""
+        lines = [
+            Line("try:", indent),
+            Line(
+                # f"basket['__params__']['{self.param.name}'] = "
+                f"basket['__matches__'][{idx}] = "
+                f"{unquote_start}{self.param.cast.__name__}(parts[{idx}])"
+                f"{unquote_end}",
+                indent + 1,
+            ),
+            Line("except ValueError:", indent),
+            Line("pass", indent + 1),
+            Line("else:", indent),
+        ]
+        self.base_indent += 1
+        # for idx, param in group.params.items():
+        #     lines.append(
+        #     )
+
+        location.extend(lines)
 
     def _inject_method_check(self, location, indent, group):
         for i, route in enumerate(group.routes):
@@ -449,10 +339,10 @@ class Node:
         route_return = "" if group.router.stacking else f"[{route_idx}]"
         location.extend(
             [
-                Line("# Return here", indent),
+                Line(f"# Return {self.ident}", indent),
                 Line(
                     (
-                        f"return router.{routes}[{group.parts}]"
+                        f"return router.{routes}[{group.segments}]"
                         f"{route_return}, basket"
                     ),
                     indent,
@@ -462,14 +352,6 @@ class Node:
 
     def _inject_requirements(self, location, indent, group):
         for k, route in enumerate(group):
-            # if k == 0:
-            #     location.extend(
-            #         [
-            #             Line(f"if num > {self.level}:", indent),
-            #             Line("raise NotFound", indent + 1),
-            #         ]
-            #     )
-
             conditional = "if" if k == 0 else "elif"
             location.extend(
                 [
@@ -509,58 +391,34 @@ class Node:
             ]
         )
 
-    # def _inject_params(self, location, indent, first_params):
-    def _inject_params(self, location, indent, group):
-        lines = []
-        # if self.last:
-        #     if self.parent.has_deferred:
-        #         lines = [
-        #             Line(f"if num == {self.level}:", indent - 1),
-        #         ]
-        #     else:
-        #         if self._has_nested_regex(self):
-        #             lines = [
-        #                 Line(f"if num == {self.level}:", indent),
-        #             ]
-        #             indent += 1
-        #         else:
-        #             lines = [
-        #                 Line(f"if num > {self.level}:", indent),
-        #                 Line("raise NotFound", indent + 1),
-        #             ]
-        # else:
-        #     lines = []
-        #     if first_params:
-        #         lines.append(
-        #             Line(f"if num == {self.level}:", indent - 1),
-        #         )
-        lines.append(Line("try:", indent))
-        for idx, param in group.params.items():
-            unquote_start = "unquote(" if group.unquote else ""
-            unquote_end = ")" if group.unquote else ""
-            lines.append(
-                Line(
-                    f"basket['__params__']['{param.name}'] = "
-                    f"{unquote_start}{param.cast.__name__}(basket[{idx}])"
-                    f"{unquote_end}",
-                    indent + 1,
-                )
-            )
+    # def _inject_params(self, location, indent, group):
+    #     lines = []
+    #     lines.append(Line("try:", indent))
+    #     for idx, param in group.params.items():
+    #         unquote_start = "unquote(" if group.unquote else ""
+    #         unquote_end = ")" if group.unquote else ""
+    #         lines.append(
+    #             Line(
+    #                 f"basket['__params__']['{param.name}'] = "
+    #                 f"{unquote_start}{param.cast.__name__}(basket[{idx}])"
+    #                 f"{unquote_end}",
+    #                 indent + 1,
+    #             )
+    #         )
 
-        location.extend(
-            lines
-            + [
-                # Line("except (ValueError, KeyError):", indent),
-                Line("except ValueError:", indent),
-                Line("pass", indent + 1),
-                Line("else:", indent),
-            ]
-        )
+    #     location.extend(
+    #         lines
+    #         + [
+    #             # Line("except (ValueError, KeyError):", indent),
+    #             Line("except ValueError:", indent),
+    #             Line("pass", indent + 1),
+    #             Line("else:", indent),
+    #         ]
+    #     )
 
     # def _has_nested_path(self, node, recursive=True):
-    #     if node.group and (
-    #         (node.group.labels and "path" in node.group.labels)
-    #         or (node.group.pattern and r"/" in node.group.pattern)
+    #     if node.param and (
+    #         (node.param.label == "path") or (r"/" in node.param.label)
     #     ):
     #         return True
     #     if recursive and node.children:
@@ -580,16 +438,19 @@ class Node:
 
     def _sorting(self, item) -> t.Tuple[bool, int, str, bool, int]:
         key, child = item
+        type_ = 0
+        if child.dynamic:
+            type_ = child.param.priority
 
         return (
             bool(child.groups),
             child.dynamic,
+            type_ * -1,
             child.depth * -1,
             len(child._children),
             not bool(
                 child.groups and any(group.regex for group in child.groups)
             ),
-            # type_ * -1,
             key,
         )
 
@@ -609,7 +470,6 @@ class Node:
             return type_ * -1
 
         segments = tuple(map(get_type, item.parts))
-        print(f"{segments=}")
         return segments
 
     @property
@@ -629,20 +489,27 @@ class Tree:
         for group in groups:
             current = self.root
             for level, part in enumerate(group.parts):
-                dynamic = False
+                param = None
                 dynamic = part.startswith("<")
                 if dynamic:
                     if not REGEX_PARAM_NAME.match(part):
                         raise ValueError(f"Invalid declaration: {part}")
-                    part = "__dynamic__"
+                    part = f"__dynamic__:{group.params[level].label}"
+                    param = group.params[level]
                 if part not in current._children:
-                    child = Node(part=part, parent=current, router=self.router)
+                    child = Node(
+                        part=part,
+                        parent=current,
+                        router=self.router,
+                        param=param,
+                    )
                     child.dynamic = dynamic
                     current.add_child(child)
                 current = current._children[part]
                 current.level = level + 1
 
             current.groups.append(group)
+            current.unquote = current.unquote or group.unquote
 
     def display(self) -> None:
         """

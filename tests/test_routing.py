@@ -2,7 +2,6 @@ import uuid
 from datetime import date
 
 import pytest
-
 from sanic_routing import BaseRouter
 from sanic_routing.exceptions import NoMethod, NotFound, RouteExists
 
@@ -165,9 +164,10 @@ def test_conditional_check_proper_compile(handler):
 def test_use_param_name(handler, param_name):
     router = Router()
     path_part_with_param = f"<{param_name}>"
+    path_part_with_param_as_string = f"<{param_name}:string>"
     router.add(f"/path/{path_part_with_param}", handler)
     route = list(router.routes)[0]
-    assert ("path", path_part_with_param) == route.parts
+    assert ("path", path_part_with_param_as_string) == route.parts
 
 
 @pytest.mark.parametrize(
