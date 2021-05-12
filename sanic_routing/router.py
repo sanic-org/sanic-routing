@@ -377,7 +377,7 @@ class BaseRouter(ABC):
                     self._optimize(syntax_tree.body[0])
 
                 if sys.version_info.major == 3 and sys.version_info.minor >= 9:
-                    self.find_route_src_compiled = ast.unparse(syntax_tree)
+                    self.find_route_src_compiled = ast.unparse(syntax_tree)  # type: ignore
 
                 ast.fix_missing_locations(syntax_tree)
 
