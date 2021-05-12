@@ -16,6 +16,7 @@ def alpha(param: str) -> str:
 REGEX_PARAM_NAME = re.compile(r"^<([a-zA-Z_][a-zA-Z0-9_]*)(?::(.*))?>$")
 REGEX_TYPES = {
     "string": (str, re.compile(r"^[^/]+")),
+    "str": (str, re.compile(r"^[^/]+")),
     "alpha": (alpha, re.compile(r"^[A-Za-z]+")),
     "path": (str, re.compile(r"^[^/]?.*?")),
     "number": (float, re.compile(r"^-?(?:\d+(?:\.\d*)?|\.\d+)")),

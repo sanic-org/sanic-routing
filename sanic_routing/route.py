@@ -2,6 +2,7 @@ import re
 import typing as t
 from collections import namedtuple
 from types import SimpleNamespace
+from warnings import warn
 
 from .exceptions import InvalidUsage, ParameterNameConflicts
 from .utils import Immutable, parts_to_path, path_to_parts
@@ -108,7 +109,7 @@ class Route:
         for part in path.split(self.router.delimiter):
             if "<" in part and ":" not in part:
                 name = part[1:-1]
-                part = f"<{name}:string>"
+                part = f"<{name}:str>"
             segments.append(part)
         return self.router.delimiter.join(segments)
 
@@ -264,12 +265,19 @@ class Route:
         # We could receive NAME or NAME:PATTERN
         parameter_string = parameter_string.strip("<>")
         name = parameter_string
-        label = "string"
+        label = "str"
         if ":" in parameter_string:
             name, label = parameter_string.split(":", 1)
             if not name:
                 raise ValueError(
                     f"Invalid parameter syntax: {parameter_string}"
+                )
+            if label == "string":
+                warn(
+                    "Use of 'string' as a path parameter type is deprected, "
+                    "and will be removed in Sanic v21.12. "
+                    f"Instead, use <{name}:str>.",
+                    DeprecationWarning,
                 )
 
         default = (str, label)

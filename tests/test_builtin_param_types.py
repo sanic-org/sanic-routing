@@ -43,7 +43,7 @@ def test_correct_alpha_v_string(handler):
     router = Router()
 
     router.add("/<alphaonly:alpha>", handler)
-    router.add("/<anystring:string>", handler)
+    router.add("/<anystring:str>", handler)
     router.finalize()
 
     _, handler, params = router.get("/foobar", "BASE")
@@ -57,3 +57,16 @@ def test_correct_alpha_v_string(handler):
 
     assert isinstance(retval, str)
     assert retval == "foobar123"
+
+
+def test_use_string_raises_deprecation_warning(handler):
+    router = Router()
+
+    with pytest.warns(DeprecationWarning) as record:
+        router.add("/<foo:string>", handler)
+
+    assert len(record) == 1
+    assert record[0].message.args[0] == (
+        "Use of 'string' as a path parameter type is deprected, and will be "
+        "removed in Sanic v21.12. Instead, use <foo:str>."
+    )
