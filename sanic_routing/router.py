@@ -1,4 +1,5 @@
 import ast
+import sys
 import typing as t
 from abc import ABC, abstractmethod
 from types import SimpleNamespace
@@ -365,18 +366,23 @@ class BaseRouter(ABC):
         src.append(Line("raise NotFound", 1))
         src.extend(delayed)
 
-        self.find_route_src_raw = "".join(
+        self.find_route_src = "".join(
             map(str, filter(lambda x: x.render, src))
         )
         if do_compile:
             try:
-                syntax_tree = ast.parse(self.find_route_src_raw)
+                syntax_tree = ast.parse(self.find_route_src)
 
                 if do_optimize:
                     self._optimize(syntax_tree.body[0])
-                self.find_route_src = ast.unparse(syntax_tree)
+
+                if sys.version_info.major == 3 and sys.version_info.minor >= 9:
+                    self.find_route_src_compiled = ast.unparse(syntax_tree)
+
+                ast.fix_missing_locations(syntax_tree)
+
                 compiled_src = compile(
-                    self.find_route_src,
+                    syntax_tree,
                     "",
                     "exec",
                 )
@@ -386,7 +392,7 @@ class BaseRouter(ABC):
                     f"{' '*max(0,int(se.offset or 0)-1) + '^'}"
                 )
                 raise FinalizationError(
-                    f"Cannot compile route AST:\n{self.find_route_src_raw}"
+                    f"Cannot compile route AST:\n{self.find_route_src}"
                     f"\n{syntax_error}"
                 )
             ctx: t.Dict[t.Any, t.Any] = {}
