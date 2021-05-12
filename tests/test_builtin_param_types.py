@@ -1,4 +1,5 @@
 import pytest
+
 from sanic_routing import BaseRouter
 from sanic_routing.exceptions import NotFound
 
@@ -69,6 +70,19 @@ def test_use_string_raises_deprecation_warning(handler):
     assert record[0].message.args[0] == (
         "Use of 'string' as a path parameter type is deprected, and will be "
         "removed in Sanic v21.12. Instead, use <foo:str>."
+    )
+
+
+def test_use_number_raises_deprecation_warning(handler):
+    router = Router()
+
+    with pytest.warns(DeprecationWarning) as record:
+        router.add("/<foo:number>", handler)
+
+    assert len(record) == 1
+    assert record[0].message.args[0] == (
+        "Use of 'number' as a path parameter type is deprected, and will be "
+        "removed in Sanic v21.12. Instead, use <foo:float>."
     )
 
 

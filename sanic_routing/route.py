@@ -279,6 +279,13 @@ class Route:
                     f"Instead, use <{name}:str>.",
                     DeprecationWarning,
                 )
+            elif label == "number":
+                warn(
+                    "Use of 'number' as a path parameter type is deprected, "
+                    "and will be removed in Sanic v21.12. "
+                    f"Instead, use <{name}:float>.",
+                    DeprecationWarning,
+                )
 
         default = (str, label)
         # Pull from pre-configured types

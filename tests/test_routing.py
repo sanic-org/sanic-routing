@@ -2,7 +2,6 @@ import uuid
 from datetime import date
 
 import pytest
-
 from sanic_routing import BaseRouter
 from sanic_routing.exceptions import NoMethod, NotFound, RouteExists
 
@@ -116,28 +115,31 @@ def test_cast_types_at_same_position(handler):
 @pytest.mark.parametrize(
     "label,value,cast_type",
     (
-        ("string", "foo_-", str),
+        ("str", "foo_-", str),
         ("int", 11111, int),
         ("number", 99.99, float),
         ("alpha", "ABCxyz", str),
         ("ymd", "2021-01-01", date),
         ("uuid", uuid.uuid4(), uuid.UUID),
+        ("slug", "foo-bar", str),
     ),
 )
 def test_casting(handler, label, value, cast_type):
     router = Router()
-    router.add("/<foo:string>", handler)
-    router.add("/<foo:int>", handler)
-    router.add("/<foo:number>", handler)
-    router.add("/<foo:alpha>", handler)
-    router.add("/<foo:ymd>", handler)
-    router.add("/<foo:uuid>", handler)
+    router.add("/<str:str>", handler)
+    router.add("/<int:int>", handler)
+    router.add("/<number:number>", handler)
+    router.add("/<alpha:alpha>", handler)
+    router.add("/<ymd:ymd>", handler)
+    router.add("/<uuid:uuid>", handler)
+    router.add("/<slug:slug>", handler)
 
     router.finalize()
     _, handler, params = router.get(f"/{value}", "BASE")
     retval = handler(**params)
 
     assert isinstance(retval, cast_type)
+    assert label in params
 
 
 def test_conditional_check_proper_compile(handler):
@@ -165,7 +167,7 @@ def test_conditional_check_proper_compile(handler):
 def test_use_param_name(handler, param_name):
     router = Router()
     path_part_with_param = f"<{param_name}>"
-    path_part_with_param_as_string = f"<{param_name}:string>"
+    path_part_with_param_as_string = f"<{param_name}:str>"
     router.add(f"/path/{path_part_with_param}", handler)
     route = list(router.routes)[0]
     assert ("path", path_part_with_param_as_string) == route.parts
@@ -295,7 +297,7 @@ def test_route_correct_coercion():
         ...
 
     router = Router()
-    router.add("/<test:string>", handler1)
+    router.add("/<test:str>", handler1)
     router.add("/<test:int>", handler2)
     router.add("/<test:uuid>", handler3)
     router.add("/<test:ymd>", handler4)
@@ -385,7 +387,8 @@ def test_path_with_paamayim_nekudotayim():
 
     router = Router()
     router.add(
-        r"/path/to/<file_uuid:(?P<file_uuid>[A-Fa-f0-9]{8}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{12})(?:\.[A-z]{1,4})?>",
+        r"/path/to/<file_uuid:(?P<file_uuid>[A-Fa-f0-9]{8}-[A-Fa-f0-9]{4}"
+        r"-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{4}-[A-Fa-f0-9]{12})(?:\.[A-z]{1,4})?>",
         handler,
     )
 
