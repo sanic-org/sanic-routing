@@ -7,10 +7,16 @@ def parse_date(d):
     return datetime.strptime(d, "%Y-%m-%d").date()
 
 
+def alpha(param: str) -> str:
+    if not param.isalpha():
+        raise ValueError(f"Value {param} contains non-alphabetic chracters")
+    return param
+
+
 REGEX_PARAM_NAME = re.compile(r"^<([a-zA-Z_][a-zA-Z0-9_]*)(?::(.*))?>$")
 REGEX_TYPES = {
     "string": (str, re.compile(r"^[^/]+")),
-    "alpha": (str, re.compile(r"^[A-Za-z]+")),
+    "alpha": (alpha, re.compile(r"^[A-Za-z]+")),
     "path": (str, re.compile(r"^[^/]?.*?")),
     "number": (float, re.compile(r"^-?(?:\d+(?:\.\d*)?|\.\d+)")),
     "int": (int, re.compile(r"^-?\d+")),

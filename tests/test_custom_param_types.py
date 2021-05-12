@@ -1,7 +1,6 @@
 import ipaddress
 
 import pytest
-
 from sanic_routing import BaseRouter
 from sanic_routing.exceptions import InvalidUsage, NotFound
 
@@ -24,7 +23,8 @@ def test_does_cast(handler):
     router.register_pattern(
         "ipv4",
         ipaddress.ip_address,
-        r"^(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$",
+        r"^(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(?:25[0-5]|"
+        r"2[0-4][0-9]|[01]?[0-9][0-9]?)$",
     )
 
     router.add("/<ip:ipv4>", handler)
@@ -41,7 +41,8 @@ def test_does_not_cast(handler):
     router.register_pattern(
         "ipv4",
         ipaddress.ip_address,
-        r"^(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$",
+        r"^(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(?:25[0-5]|"
+        r"2[0-4][0-9]|[01]?[0-9][0-9]?)$",
     )
 
     router.add("/<ip:ipv4>", handler)
