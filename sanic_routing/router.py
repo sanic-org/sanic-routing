@@ -3,6 +3,7 @@ import sys
 import typing as t
 from abc import ABC, abstractmethod
 from types import SimpleNamespace
+from warnings import warn
 
 from sanic_routing.group import RouteGroup
 
@@ -236,7 +237,7 @@ class BaseRouter(ABC):
         globals()[cast.__name__] = cast
         self.regex_types[label] = (cast, pattern)
 
-    def finalize(self, do_compile: bool = True, do_optimize: bool = True):
+    def finalize(self, do_compile: bool = True, do_optimize: bool = False):
         if self.finalized:
             raise FinalizationError("Cannot finalize router more than once.")
         if not self.routes:
@@ -282,7 +283,7 @@ class BaseRouter(ABC):
         self.tree.finalize()
 
     def _render(
-        self, do_compile: bool = True, do_optimize: bool = True
+        self, do_compile: bool = True, do_optimize: bool = False
     ) -> None:
         src = [
             Line("def find_route(path, method, router, basket, extra):", 0),
@@ -349,10 +350,7 @@ class BaseRouter(ABC):
                         1,
                     ),
                     Line("if match:", 1),
-                    Line(
-                        "basket['__params__'] = match.groupdict()",
-                        2,
-                    ),
+                    Line("basket['__params__'] = match.groupdict()", 2),
                     Line(
                         (
                             f"return router.{route_container}"
@@ -380,7 +378,7 @@ class BaseRouter(ABC):
                     setattr(
                         self,
                         "find_route_src_compiled",
-                        ast.unparse(syntax_tree),
+                        ast.unparse(syntax_tree),  # type: ignore
                     )
 
                 ast.fix_missing_locations(syntax_tree)
@@ -427,6 +425,10 @@ class BaseRouter(ABC):
         )
 
     def _optimize(self, node) -> None:
+        warn(
+            "Router AST optimization is an experimental only feature. "
+            "Results may vary from unoptimized code."
+        )
         if hasattr(node, "body"):
             for child in node.body:
                 self._optimize(child)
@@ -439,22 +441,22 @@ class BaseRouter(ABC):
             #       if parts[1] == 'foo' and num > 3:
             # Testing has shown that further recursion does not actually
             # produce any faster results.
-            # if self._is_lone_if(node) and self._is_lone_if(node.body[0]):
-            #     current = node.body[0]
-            #     nested = node.body[0].body[0]
+            if self._is_lone_if(node) and self._is_lone_if(node.body[0]):
+                current = node.body[0]
+                nested = node.body[0].body[0]
 
-            #     values: t.List[t.Any] = []
-            #     for test in [current.test, nested.test]:
-            #         if isinstance(test, ast.Compare):
-            #             values.append(test)
-            #         elif isinstance(test, ast.BoolOp) and isinstance(
-            #             test.op, ast.And
-            #         ):
-            #             values.extend(test.values)
-            #     combined = ast.BoolOp(op=ast.And(), values=values)
+                values: t.List[t.Any] = []
+                for test in [current.test, nested.test]:
+                    if isinstance(test, ast.Compare):
+                        values.append(test)
+                    elif isinstance(test, ast.BoolOp) and isinstance(
+                        test.op, ast.And
+                    ):
+                        values.extend(test.values)
+                combined = ast.BoolOp(op=ast.And(), values=values)
 
-            #     current.test = combined
-            #     current.body = nested.body
+                current.test = combined
+                current.body = nested.body
 
             # Look for identical successive if blocks
             # EXAMPLE:
@@ -466,16 +468,16 @@ class BaseRouter(ABC):
             #       if num == 5:
             #           foo1()
             #           foo2()
-            # if (
-            #     all(isinstance(child, ast.If) for child in node.body)
-            #     and len({child.test for child in node.body})
-            #     and len(node.body) > 1
-            # ):
-            #     first, *rem = node.body
-            #     for item in rem:
-            #         first.body.extend(item.body)
+            if (
+                all(isinstance(child, ast.If) for child in node.body)
+                and len({child.test for child in node.body})
+                and len(node.body) > 1
+            ):
+                first, *rem = node.body
+                for item in rem:
+                    first.body.extend(item.body)
 
-            #     node.body = [first]
+                node.body = [first]
 
         if hasattr(node, "orelse"):
             for child in node.orelse:
