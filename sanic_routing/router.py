@@ -2,6 +2,7 @@ import ast
 import sys
 import typing as t
 from abc import ABC, abstractmethod
+from re import Pattern
 from types import SimpleNamespace
 from warnings import warn
 
@@ -73,7 +74,7 @@ class BaseRouter(ABC):
         method: t.Optional[str] = None,
         orig: t.Optional[str] = None,
         extra: t.Optional[t.Dict[str, str]] = None,
-    ):
+    ) -> t.Tuple[Route, t.Callable[..., t.Any], t.Dict[str, t.Any]]:
         try:
             route, param_basket = self.find_route(
                 path,
@@ -83,6 +84,8 @@ class BaseRouter(ABC):
                 extra,
             )
         except (NotFound, NoMethod) as e:
+            # If we did not find the route, we might need to try routing one
+            # more time to handle strict_slashes
             if path.endswith(self.delimiter):
                 return self.resolve(
                     path=path[:-1],
@@ -102,13 +105,20 @@ class BaseRouter(ABC):
                     allowed_methods=route.methods,
                 )
 
+        # Regex routes evaluate and can extract params directly. They are set
+        # on param_basket["__params__"]
         params = param_basket["__params__"]
         if not params:
+            # If param_basket["__params__"] does not exist, we might have
+            # param_basket["__matches__"], which are indexed based matches
+            # on path segments. They should already be cast types.
             params = {
                 param.name: param_basket["__matches__"][idx]
                 for idx, param in route.params.items()
             }
 
+        # Double check that if we made a match it is not a false positive
+        # because of strict_slashes
         if route.strict and orig and orig[-1] != route.path[-1]:
             raise self.exception("Path not found", path=path)
 
@@ -133,6 +143,9 @@ class BaseRouter(ABC):
         overwrite: bool = False,
         append: bool = False,
     ) -> Route:
+        # Can add a route with overwrite, or append, not both.
+        # - overwrite: if matching path exists, replace it
+        # - append: if matching path exists, append handler to it
         if overwrite and append:
             raise FinalizationError(
                 "Cannot add a route with both overwrite and append equal "
@@ -164,6 +177,10 @@ class BaseRouter(ABC):
         static = "<" not in path and requirements is None
         regex = self._is_regex(path)
 
+        # There are generally three pools of routes on the router:
+        # - those that are static patterns with not matching
+        # - those that have one or more dynamic parts, but NO regex
+        # - those that have one or more dynamic parts, with at least one regex
         if regex:
             routes = self.regex_routes
         elif static:
@@ -176,6 +193,8 @@ class BaseRouter(ABC):
             path_to_parts(path, self.delimiter), self.delimiter
         )
 
+        # We need to clean off the delimiters are the beginning, and maybe the
+        # end, depending upon whether we are in strict mode
         strip = path.lstrip if strict else path.strip
         path = strip(self.delimiter)
         route = self.route_class(
@@ -217,7 +236,27 @@ class BaseRouter(ABC):
 
         return route
 
-    def register_pattern(self, label, cast, pattern):
+    def register_pattern(
+        self, label: str, cast: t.Callable[[str], t.Any], pattern: Pattern
+    ):
+        """
+        Add a custom parameter type to the router. The cast shoud raise a
+        ValueError if it is an incorrect type. The order of registration is
+        important if it is possible that a single value could pass multiple
+        pattern types. Therefore, patterns are tried in the REVERSE order of
+        registration. All custom patterns will be evaluated before any built-in
+        patterns.
+
+        :param label: The parts that is used to signify the type: example
+
+        :type label: str
+        :param cast: The callable that casts the value to the desired type, or
+            fails trying
+        :type cast: t.Callable[[str], t.Any]
+        :param pattern: A regular expression that could also match the path
+            segment
+        :type pattern: Pattern
+        """
         if not isinstance(label, str):
             raise InvalidUsage(
                 "When registering a pattern, label must be a "
@@ -238,6 +277,19 @@ class BaseRouter(ABC):
         self.regex_types[label] = (cast, pattern)
 
     def finalize(self, do_compile: bool = True, do_optimize: bool = False):
+        """
+        After all routes are added, we can put everything into a final state
+        and build the routing dource
+
+        :param do_compile: Whether to compile the source, mainly a debugging
+            tool, defaults to True
+        :type do_compile: bool, optional
+        :param do_optimize: Experimental feature that uses AST module to make
+            some optimizations, defaults to False
+        :type do_optimize: bool, optional
+        :raises FinalizationError: Cannot finalize if there are no routes, or
+        the router has already been finalized (can call reset() to undo it)
+        """
         if self.finalized:
             raise FinalizationError("Cannot finalize router more than once.")
         if not self.routes:
@@ -253,7 +305,11 @@ class BaseRouter(ABC):
             for route in group.routes:
                 route.finalize()
 
+        # Evaluates all of the paths and arranges them into a hierarchichal
+        # tree of nodes
         self._generate_tree()
+
+        # Renders the source code
         self._render(do_compile, do_optimize)
 
     def reset(self):
@@ -270,7 +326,21 @@ class BaseRouter(ABC):
             for route in group.routes:
                 route.reset()
 
-    def _get_non_static_non_path_groups(self, has_dynamic_path: bool):
+    def _get_non_static_non_path_groups(
+        self, has_dynamic_path: bool
+    ) -> t.List[RouteGroup]:
+        """
+        Paths that have some matching params (includes dynamic and regex),
+        but excludes any routes with a <path:path> or delimiter in its regex.
+        This is because those special cases need to be evaluated seperately.
+        Anything else can be evaluated in the node tree.
+
+        :param has_dynamic_path: Whether the path catches a path, or path-like
+        type
+        :type has_dynamic_path: bool
+        :return: list of routes that have no path, but do need matching
+        :rtype: List[RouteGroup]
+        """
         return [
             group
             for group in list(self.dynamic_routes.values())
@@ -285,12 +355,14 @@ class BaseRouter(ABC):
     def _render(
         self, do_compile: bool = True, do_optimize: bool = False
     ) -> None:
+        # Initial boilerplate for the function source
         src = [
             Line("def find_route(path, method, router, basket, extra):", 0),
             Line("parts = tuple(path[1:].split(router.delimiter))", 1),
         ]
         delayed = []
 
+        # Add static path matching
         if self.static_routes:
             # TODO:
             # - future improvement would be to decide which option to use
@@ -319,6 +391,9 @@ class BaseRouter(ABC):
             #     Line("basket['__raw_path__'] = route.path", 2),
             #     Line("return route, basket", 2),
             # ]
+
+        # Add in pre-compiled regular expressions so they do not need to
+        # compile at run time
         if self.regex_routes:
             routes = sorted(
                 self.regex_routes.values(),
@@ -331,10 +406,12 @@ class BaseRouter(ABC):
                 delayed.append(Line(f"re.compile(r'^{group.pattern}$'),", 1))
             delayed.append(Line("]", 0))
 
+        # Generate all the dynamic code
         if self.dynamic_routes or self.regex_routes:
             src += [Line("num = len(parts)", 1)]
             src += self.tree.render()
 
+        # Inject regex matching that could not be in the tree
         for group in self._get_non_static_non_path_groups(True):
             route_container = (
                 "regex_routes" if group.regex else "dynamic_routes"
@@ -375,12 +452,18 @@ class BaseRouter(ABC):
                     self._optimize(syntax_tree.body[0])
 
                 if sys.version_info.major == 3 and sys.version_info.minor >= 9:
+                    # This is purely a convenience thing. Python 3.9 added this
+                    # feature, so it allows us to see exactly how the
+                    # interpreter will see the code after compiling and any
+                    # optimizing.
                     setattr(
                         self,
                         "find_route_src_compiled",
                         ast.unparse(syntax_tree),  # type: ignore
                     )
 
+                # Sometimes there may be missing meta data, so we add it back
+                # before compiling
                 ast.fix_missing_locations(syntax_tree)
 
                 compiled_src = compile(

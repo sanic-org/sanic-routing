@@ -64,6 +64,10 @@ class Node:
         return list(self.parent.children.keys()).index(self.part) + 1
 
     def finalize_children(self):
+        """
+        Sort the children (if any), and set properties for easy checking
+        # they are at the beginning or end of the line.
+        """
         self.children = {
             k: v for k, v in sorted(self._children.items(), key=self._sorting)
         }
@@ -84,41 +88,29 @@ class Node:
             child.display()
 
     def render(self) -> t.Tuple[t.List[Line], t.List[Line]]:
-        output: t.List[Line] = []
+        # output - code injected into the source as it is being
+        #    called/evalueated
+        # delayed - code that is injected after you do all of its children
+        #    first
+        # final - code that is injected at the very end of all rendering
+        src: t.List[Line] = []
         delayed: t.List[Line] = []
         final: t.List[Line] = []
 
         if not self.root:
-            output, delayed, final = self.to_src()
+            src, delayed, final = self.to_src()
         for child in self.children.values():
             o, f = child.render()
-            output += o
+            src += o
             final += f
-        return output + delayed, final
-
-    def apply_offset(self, amt, apply_self=True, apply_children=False):
-        if apply_self:
-            self.offset += amt
-        if apply_children:
-            for child in self.children.values():
-                child.apply_offset(amt, apply_children=True)
+        return src + delayed, final
 
     def to_src(self) -> t.Tuple[t.List[Line], t.List[Line], t.List[Line]]:
         siblings = self.parent.children if self.parent else {}
-        # prev_node: t.Optional[Node] = None
-        # next_node: t.Optional[Node] = None
-        current: t.Optional[Node] = None
         first_sibling: t.Optional[Node] = None
 
         if not self.first:
             first_sibling = list(siblings.values())[0]
-
-        for child in siblings.values():
-            if current is self:
-                # next_node = child
-                break
-            # prev_node = current
-            current = child
 
         self.base_indent = (
             bool(self.level >= 1 or self.first) + self.parent.base_indent
@@ -127,10 +119,13 @@ class Node:
         )
 
         indent = self.base_indent
+
+        # See render() docstring for definition of these three sequences
         delayed: t.List[Line] = []
         final: t.List[Line] = []
         src: t.List[Line] = []
 
+        # Some cleanup to make code easier to read
         src.append(Line("", indent))
         src.append(Line(f"# node={self.ident} // part={self.part}", indent))
 
@@ -142,6 +137,10 @@ class Node:
         operation = ">"
         conditional = "if"
 
+        # The "equality_check" is when we do a "==" operation to check
+        # that the incoming path is the same length as a particular target.
+        # Since this could take place in a few different locations, we need
+        # to be able to track if it has been set.
         if self.groups:
             operation = "==" if self.level == self.parent.depth else ">="
             self.equality_check = operation == "=="
@@ -155,6 +154,8 @@ class Node:
         indent += 1
 
         if self.dynamic:
+            # Injects code to try casting a segment to all POTENTIAL types that
+            # the defined routes could catch in this location
             self._inject_param_check(src, indent, idx)
             indent += 1
 
@@ -167,6 +168,7 @@ class Node:
             ):
                 self.equality_check = first_sibling.equality_check
 
+            # Maybe try and sneak an equality check in?
             if_stmt = "if"
             len_check = (
                 f" and num == {self.level}"
@@ -185,11 +187,13 @@ class Node:
             )
             self.base_indent += 1
 
+        # Get ready to return some handlers
         if self.groups:
             return_indent = indent + return_bump
             route_idx: t.Union[int, str] = 0
             location = delayed
 
+            # Do any missing equality_check
             if not self.equality_check:
                 conditional = "elif" if self.children else "if"
                 operation = "=="
@@ -204,24 +208,32 @@ class Node:
             for group in sorted(self.groups, key=self._group_sorting):
                 group_bump = 0
 
+                # If the route had some requirements, let's make sure we check
+                # them in the source
                 if group.requirements:
                     route_idx = "route_idx"
                     self._inject_requirements(
                         location, return_indent + group_bump, group
                     )
 
+                # This is for any inline regex routes. It sould not include,
+                # path or path-like routes.
                 if group.regex:
                     self._inject_regex(
                         location, return_indent + group_bump, group
                     )
                     group_bump += 1
 
+                # Since routes are grouped, we need to know which to select
+                # Inside the compiled source, we keep track so we know which
+                # handler to assign this to
                 if route_idx == 0 and len(group.routes) > 1:
                     route_idx = "route_idx"
                     self._inject_method_check(
                         location, return_indent + group_bump, group
                     )
 
+                # The return.kingdom
                 self._inject_return(
                     location, return_indent + group_bump, route_idx, group
                 )
@@ -231,12 +243,10 @@ class Node:
     def add_child(self, child: "Node") -> None:
         self._children[child.part] = child
 
-    def _mark_parents_defer(self, parent):
-        parent.has_deferred = True
-        if getattr(parent, "parent", None):
-            self._mark_parents_defer(parent.parent)
-
     def _inject_param_check(self, location, indent, idx):
+        """
+        Try and cast relevant path segments.
+        """
         unquote_start = "unquote(" if self.unquote else ""
         unquote_end = ")" if self.unquote else ""
         lines = [
@@ -256,6 +266,9 @@ class Node:
         location.extend(lines)
 
     def _inject_method_check(self, location, indent, group):
+        """
+        Sometimes we need to check the routing methods inside the generated src
+        """
         for i, route in enumerate(group.routes):
             if_stmt = "if" if i == 0 else "elif"
             location.extend(
@@ -275,6 +288,9 @@ class Node:
         )
 
     def _inject_return(self, location, indent, route_idx, group):
+        """
+        The return statement for the node if neededs
+        """
         routes = "regex_routes" if group.regex else "dynamic_routes"
         route_return = "" if group.router.stacking else f"[{route_idx}]"
         location.extend(
@@ -291,6 +307,10 @@ class Node:
         )
 
     def _inject_requirements(self, location, indent, group):
+        """
+        Check any extra checks needed for a route. In path routing, for exampe,
+        this is used for matching vhosts.
+        """
         for k, route in enumerate(group):
             conditional = "if" if k == 0 else "elif"
             location.extend(
@@ -314,6 +334,11 @@ class Node:
         )
 
     def _inject_regex(self, location, indent, group):
+        """
+        For any path matching that happens in the course of the tree (anything
+        that has a path matching--<path:path>--or similar matching with regex
+        delimiter)
+        """
         location.extend(
             [
                 Line(
@@ -332,6 +357,9 @@ class Node:
         )
 
     def _sorting(self, item) -> t.Tuple[bool, bool, int, int, int, bool, str]:
+        """
+        Primarily use to sort nodes to determine the order of the nested tree
+        """
         key, child = item
         type_ = 0
         if child.dynamic:
@@ -350,6 +378,11 @@ class Node:
         )
 
     def _group_sorting(self, item) -> t.Tuple[int, ...]:
+        """
+        When multiple RouteGroups terminate on the same node, we want to
+        evaluate them based upon the priority of the param matching types
+        """
+
         def get_type(segment):
             type_ = 0
             if segment.startswith("<"):
@@ -381,6 +414,10 @@ class Tree:
         self.router = router
 
     def generate(self, groups: t.Iterable[RouteGroup]) -> None:
+        """
+        Arrange RouteGroups into hierarchical nodes and arrange them into
+        a tree
+        """
         for group in groups:
             current = self.root
             for level, part in enumerate(group.parts):

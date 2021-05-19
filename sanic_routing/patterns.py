@@ -20,6 +20,15 @@ def slug(param: str) -> str:
 
 
 REGEX_PARAM_NAME = re.compile(r"^<([a-zA-Z_][a-zA-Z0-9_]*)(?::(.*))?>$")
+
+# Predefined path parameter types. The value is a tuple consisteing of a
+# callable and a compiled regular expression.
+# The callable should:
+#   1. accept a string input
+#   2. cast the string to desired type
+#   3. raise ValueError if it cannot
+# The regular expression is generally NOT used. Unless the path is forced
+# to use regex patterns.
 REGEX_TYPES = {
     "string": (str, re.compile(r"^[^/]+$")),
     "str": (str, re.compile(r"^[^/]+$")),

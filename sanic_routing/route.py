@@ -65,8 +65,12 @@ class Route:
         self._params: t.Dict[int, ParamInfo] = {}
         self._raw_path = raw_path
 
+        # Main goal is to do some normalization. Any dynamic segments
+        # that are missing a type are rewritten with str type
         ingested_path = self._ingest_path(raw_path)
 
+        # By passing the path back and forth to deconstruct and reconstruct
+        # we can normalize it and make sure we are dealing consistently
         parts = path_to_parts(ingested_path, self.router.delimiter)
         self.path = parts_to_path(parts, delimiter=self.router.delimiter)
         self.parts = parts
@@ -92,6 +96,10 @@ class Route:
         if not isinstance(other, self.__class__):
             return False
 
+        # Equality specifically uses self.segments and not self.parts.
+        # In general, these properties are nearly identical.
+        # self.segments is generalized and only displays dynamic param types
+        # and self.parts has both the param key and the param type
         return bool(
             (
                 self.segments,
@@ -229,7 +237,11 @@ class Route:
         return self._raw_path
 
     @property
-    def segments(self):
+    def segments(self) -> t.Tuple[str, ...]:
+        """
+        Same as self.parts except generalized so that any dynamic parts do not
+        include param keys since they have no impact on routing.
+        """
         return tuple(
             [
                 f"<__dynamic__:{self._params[idx].label}>"
@@ -241,7 +253,10 @@ class Route:
 
     @property
     def uri(self):
-        return f"/{self.path}"
+        """
+        Since self.path does NOT include a preceding '/', this adds it back.
+        """
+        return f"{self.router.delimiter}{self.path}"
 
     def _sorting(self, item) -> int:
         try:
