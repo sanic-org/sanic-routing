@@ -9,6 +9,8 @@ Beginning in v21.3, Sanic makes use of this new AST-style router in two use case
 
 Therefore, this package comes with a `BaseRouter` that needs to be subclassed in order to be used for its specific needs. 
 
+Most Sanic users should never need to concern themselves with the details here.
+
 ## Basic Example
 
 A simple implementation:
@@ -184,3 +186,7 @@ The above example only shows routes that have a dynamic path segment in them (ex
 1. *fully static paths* - These are paths with no parameters (example: `/user/login`). These are basically matched against a key/value store.
 2. *regex paths* - If a route as a single regular expression match, then the whole route will be matched via regex. In general, this happens inline not too dissimilar than what we see in the above example.
 3. *special regex paths* - The router comes with a special `path` type (example: `<foo:path>`) that can match on an expanded delimiter. This is also true for any regex that uses the path delimiter in it. These cannot be matched in the normal course since they are of unknown length.
+
+## What's next?
+
+The current plan is for this code to live outside of the main project, and be merged into `sanic-org/sanic` for the Sanic 21.9 release.
