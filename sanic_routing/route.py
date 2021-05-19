@@ -92,6 +92,9 @@ class Route:
         )
         return f"<{self.__class__.__name__}: {display}>"
 
+    def __repr__(self) -> str:
+        return str(self)
+
     def __eq__(self, other) -> bool:
         if not isinstance(other, self.__class__):
             return False
