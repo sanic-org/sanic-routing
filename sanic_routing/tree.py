@@ -89,7 +89,7 @@ class Node:
 
     def render(self) -> t.Tuple[t.List[Line], t.List[Line]]:
         # output - code injected into the source as it is being
-        #    called/evalueated
+        #    called/evaluated
         # delayed - code that is injected after you do all of its children
         #    first
         # final - code that is injected at the very end of all rendering
@@ -110,7 +110,7 @@ class Node:
         first_sibling: t.Optional[Node] = None
 
         if not self.first:
-            first_sibling = list(siblings.values())[0]
+            first_sibling = next(iter(siblings.values()))
 
         self.base_indent = (
             bool(self.level >= 1 or self.first) + self.parent.base_indent
@@ -176,7 +176,7 @@ class Node:
                 else ""
             )
 
-            self.equality_check = self.equality_check or bool(len_check)
+            self.equality_check |= bool(len_check)
 
             src.append(
                 Line(
@@ -195,6 +195,16 @@ class Node:
 
             # Do any missing equality_check
             if not self.equality_check:
+                # If if we have not done an equality check and there are
+                # children nodes, then we know there is a CHECK 1
+                # for the children that starts at the same level, and will
+                # be an exclusive conditional to what is being evaluated here.
+                # Therefore, we can use elif
+                #     example:
+                #         if num == 7:  # CHECK 1
+                #             child_node_stuff
+                #         elif num == 6:  # CHECK 5
+                #             current_node_stuff
                 conditional = "elif" if self.children else "if"
                 operation = "=="
                 location.append(
@@ -247,20 +257,25 @@ class Node:
         """
         Try and cast relevant path segments.
         """
-        unquote_start = "unquote(" if self.unquote else ""
-        unquote_end = ")" if self.unquote else ""
         lines = [
             Line("try:", indent),
             Line(
                 f"basket['__matches__'][{idx}] = "
-                f"{unquote_start}{self.param.cast.__name__}(parts[{idx}])"
-                f"{unquote_end}",
+                f"{self.param.cast.__name__}(parts[{idx}])",
                 indent + 1,
             ),
             Line("except ValueError:", indent),
             Line("pass", indent + 1),
             Line("else:", indent),
         ]
+        if self.unquote:
+            lines.append(
+                Line(
+                    f"basket['__matches__'][{idx}] = "
+                    f"unquote(basket['__matches__'][{idx}])",
+                    indent + 1,
+                )
+            )
         self.base_indent += 1
 
         location.extend(lines)
@@ -289,7 +304,7 @@ class Node:
 
     def _inject_return(self, location, indent, route_idx, group):
         """
-        The return statement for the node if neededs
+        The return statement for the node if needed
         """
         routes = "regex_routes" if group.regex else "dynamic_routes"
         route_return = "" if group.router.stacking else f"[{route_idx}]"

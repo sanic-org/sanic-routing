@@ -139,7 +139,7 @@ class RouteGroup:
     @property
     def dynamic_path(self) -> bool:
         return any(
-            (param.label == "path") or (r"/" in param.label)
+            (param.label == "path") or ("/" in param.label)
             for param in self.params.values()
         )
 

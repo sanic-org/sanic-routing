@@ -102,7 +102,9 @@ class Route:
         # Equality specifically uses self.segments and not self.parts.
         # In general, these properties are nearly identical.
         # self.segments is generalized and only displays dynamic param types
-        # and self.parts has both the param key and the param type
+        # and self.parts has both the param key and the param type.
+        # In this test, we use the & operator so that we create a union and a
+        # positive equality if there is one or more overlaps in the methods.
         return bool(
             (
                 self.segments,
@@ -118,7 +120,7 @@ class Route:
     def _ingest_path(self, path):
         segments = []
         for part in path.split(self.router.delimiter):
-            if "<" in part and ":" not in part:
+            if part.startswith("<") and ":" not in part:
                 name = part[1:-1]
                 part = f"<{name}:str>"
             segments.append(part)
@@ -132,7 +134,7 @@ class Route:
         if not self.static:
             parts = path_to_parts(key_path, self.router.delimiter)
             for idx, part in enumerate(parts):
-                if "<" in part:
+                if part.startswith("<"):
                     (
                         name,
                         label,
@@ -160,16 +162,14 @@ class Route:
 
             pattern = re.compile(pattern)
 
+        is_regex = label not in self.router.regex_types
+        priority = (
+            0
+            if is_regex
+            else list(self.router.regex_types.keys()).index(label)
+        )
         self._params[idx] = ParamInfo(
-            name,
-            raw_path,
-            label,
-            cast,
-            pattern,
-            label not in self.router.regex_types,
-            list(self.router.regex_types.keys()).index(label)
-            if label in self.router.regex_types
-            else 0,
+            name, raw_path, label, cast, pattern, is_regex, priority
         )
 
     def _finalize_params(self):
@@ -246,12 +246,10 @@ class Route:
         include param keys since they have no impact on routing.
         """
         return tuple(
-            [
-                f"<__dynamic__:{self._params[idx].label}>"
-                if self._params.get(idx)
-                else segment
-                for idx, segment in enumerate(self.parts)
-            ]
+            f"<__dynamic__:{self._params[idx].label}>"
+            if idx in self._params
+            else segment
+            for idx, segment in enumerate(self.parts)
         )
 
     @property

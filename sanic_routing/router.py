@@ -536,6 +536,8 @@ class BaseRouter(ABC):
                         test.op, ast.And
                     ):
                         values.extend(test.values)
+                    else:
+                        ...
                 combined = ast.BoolOp(op=ast.And(), values=values)
 
                 current.test = combined
@@ -553,7 +555,8 @@ class BaseRouter(ABC):
             #           foo2()
             if (
                 all(isinstance(child, ast.If) for child in node.body)
-                and len({child.test for child in node.body})
+                # TODO: create func to peoperly compare equality of conditions
+                # and len({child.test for child in node.body})
                 and len(node.body) > 1
             ):
                 first, *rem = node.body
