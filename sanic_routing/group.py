@@ -1,3 +1,8 @@
+from __future__ import annotations
+
+from typing import FrozenSet, List, Sequence
+
+from sanic_routing.route import Requirements, Route
 from sanic_routing.utils import Immutable
 
 from .exceptions import InvalidUsage, RouteExists
@@ -5,6 +10,20 @@ from .exceptions import InvalidUsage, RouteExists
 
 class RouteGroup:
     methods_index: Immutable
+    passthru_properties = (
+        "labels",
+        "params",
+        "parts",
+        "path",
+        "pattern",
+        "raw_path",
+        "regex",
+        "router",
+        "segments",
+        "strict",
+        "unquote",
+        "uri",
+    )
 
     def __init__(self, *routes) -> None:
         if len(set(route.parts for route in routes)) > 1:
@@ -25,11 +44,25 @@ class RouteGroup:
         )
         return f"<{self.__class__.__name__}: {display}>"
 
+    def __repr__(self) -> str:
+        return str(self)
+
     def __iter__(self):
         return iter(self.routes)
 
     def __getitem__(self, key):
         return self.routes[key]
+
+    def __getattr__(self, key):
+        # There are a number of properties that all of the routes in the group
+        # share in common. We pass thrm through to make them available
+        # on the RouteGroup, and then cache them so that they are permanent.
+        if key in self.passthru_properties:
+            value = getattr(self[0], key)
+            setattr(self, key, value)
+            return value
+
+        raise AttributeError(f"RouteGroup has no '{key}' attribute")
 
     def finalize(self):
         self.methods_index = Immutable(
@@ -43,7 +76,39 @@ class RouteGroup:
     def reset(self):
         self.methods_index = dict(self.methods_index)
 
-    def merge(self, group, overwrite: bool = False, append: bool = False):
+    def merge(
+        self, group: RouteGroup, overwrite: bool = False, append: bool = False
+    ) -> None:
+        """
+        The purpose of merge is to group routes with the same path, but
+        declarared individually. In other words to group these:
+
+            @app.get("/path/to")
+            def handler1(...):
+                ...
+
+            @app.post("/path/to")
+            def handler2(...):
+                ...
+
+        The other main purpose is to look for conflicts and
+        raise ``RouteExists``
+
+        A duplicate route is when:
+        1. They have the same path and any overlapping methods; AND
+        2. If they have requirements, they are the same
+
+        :param group: Incoming route group
+        :type group: RouteGroup
+        :param overwrite: whether to allow an otherwise duplicate route group
+            to overwrite the existing, if ``True`` will not raise exception
+            on duplicates, defaults to False
+        :type overwrite: bool, optional
+        :param append: whether to allow an otherwise duplicate route group to
+            append its routes to the existing route group, defaults to False
+        :type append: bool, optional
+        :raises RouteExists: Raised when there is a duplicate
+        """
         _routes = list(self._routes)
         for other_route in group.routes:
             for current_route in self:
@@ -68,55 +133,26 @@ class RouteGroup:
         self._routes = tuple(_routes)
 
     @property
-    def labels(self):
-        return self[0].labels
+    def depth(self) -> int:
+        return len(self[0].parts)
 
     @property
-    def methods(self):
+    def dynamic_path(self) -> bool:
+        return any(
+            (param.label == "path") or ("/" in param.label)
+            for param in self.params.values()
+        )
+
+    @property
+    def methods(self) -> FrozenSet[str]:
         return frozenset(
             [method for route in self for method in route.methods]
         )
 
     @property
-    def params(self):
-        return self[0].params
-
-    @property
-    def parts(self):
-        return self[0].parts
-
-    @property
-    def path(self):
-        return self[0].path
-
-    @property
-    def pattern(self):
-        return self[0].pattern
-
-    @property
-    def raw_path(self):
-        return self[0].raw_path
-
-    @property
-    def regex(self):
-        return self[0].regex
-
-    @property
-    def requirements(self):
-        return [route.requirements for route in self if route.requirements]
-
-    @property
-    def routes(self):
+    def routes(self) -> Sequence[Route]:
         return self._routes
 
     @property
-    def router(self):
-        return self[0].router
-
-    @property
-    def strict(self):
-        return self[0].strict
-
-    @property
-    def unquote(self):
-        return self[0].unquote
+    def requirements(self) -> List[Requirements]:
+        return [route.requirements for route in self if route.requirements]
