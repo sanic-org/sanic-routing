@@ -47,23 +47,17 @@ def parse_parameter_basket(route, basket, raw_path=None):
 
 
 def path_to_parts(path, delimiter="/"):
-    """
+    r"""
     OK > /foo/<id:int>/bar/<name:[A-z]+>
     OK > /foo/<unhashable:[A-Za-z0-9/]+>
-    OK > /foo/<ext:file\.(?P<ext>txt)>/<ext:[a-z]>  # noqa
+    OK > /foo/<ext:file\.(?P<ext>txt)>/<ext:[a-z]>
     OK > /foo/<user>/<user:str>
-    OK > /foo/<ext:[a-z]>/<ext:file\.(?P<ext>txt)d>  # noqa
-    NOT OK > /foo/<ext:file\.(?P<ext>txt)d>/<ext:[a-z]>  # noqa
+    OK > /foo/<ext:[a-z]>/<ext:file\.(?P<ext>txt)d>
+    NOT OK > /foo/<ext:file\.(?P<ext>txt)d>/<ext:[a-z]>
     """
-    regex_path_parts = re.compile(
-        f"(<[a-z\:]+?>|<.*?(?<![a-z])>|[^{delimiter}]+)"  # noqa
-    )
-    parts = list(regex_path_parts.findall(unquote(path))) or [""]
-    if path.endswith(delimiter):
-        parts += [""]
     return tuple(
-        [part if part.startswith("<") else quote(part) for part in parts]
-    )
+        part if part.startswith("<") else quote(part)
+        for part in re.split(rf"{delimiter}(?=[^>]*(?:<|$))", path.lstrip(delimiter)))
 
 
 def parts_to_path(parts, delimiter="/"):
