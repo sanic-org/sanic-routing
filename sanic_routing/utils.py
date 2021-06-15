@@ -55,6 +55,7 @@ def path_to_parts(path, delimiter="/"):
     OK > /foo/<ext:[a-z]>/<ext:file\.(?P<ext>txt)d>
     NOT OK > /foo/<ext:file\.(?P<ext>txt)d>/<ext:[a-z]>
     """
+    delimiter = re.escape(delimiter)
     return tuple(
         part if part.startswith("<") else quote(part)
         for part in re.split(
