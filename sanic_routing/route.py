@@ -40,13 +40,42 @@ class Route:
         "unquote",
     )
 
+    #: A container for route meta-data
+    ctx: SimpleNamespace
+    #: The route handler
+    handler: t.Callable[..., t.Any]
+    #: The HTTP methods that the route can handle
+    methods: t.FrozenSet[str]
+    #: The route name, either generated or as defined in the route definition
+    name: str
+    #: The raw version of the path exploded (see also
+    #: :py:attr:`~sanic_routing.route.Route.segments`)
+    parts: t.Tuple[str, ...]
+    #: The _reconstructed_ path after the Route has been normalized.
+    #: Does not contain preceding ``/``  (see also
+    #: :py:attr:`~sanic_routing.route.Route.uri`)
+    path: str
+    #: A regex version of the :py:attr:`~sanic_routing.route.Route.path`
+    pattern: t.Optional[str]
+    #: Whether the route requires regular expression evaluation
+    regex: bool
+    #: A representation of the non-path route requirements
+    requirements: Requirements
+    #: When ``True``, the route does not have any dynamic path parameters
+    static: bool
+    #: Whether the route should be matched with strict evaluation
+    strict: bool
+    #: Whether the route should be unquoted after matching if (for example) it
+    #: is suspected to contain non-URL friendly characters
+    unquote: bool
+
     def __init__(
         self,
         router,
         raw_path: str,
         name: str,
         handler: t.Callable[..., t.Any],
-        methods: t.Iterable[str],
+        methods: t.Sequence[str],
         requirements: t.Dict[str, t.Any] = None,
         strict: bool = False,
         unquote: bool = False,
@@ -56,7 +85,7 @@ class Route:
     ):
         self.router = router
         self.name = name
-        self.handler = handler
+        self.handler = handler  # type: ignore
         self.methods = frozenset(methods)
         self.requirements = Requirements(requirements or {})
 
@@ -237,12 +266,16 @@ class Route:
 
     @property
     def raw_path(self):
+        """
+        The raw path from the route definition
+        """
         return self._raw_path
 
     @property
     def segments(self) -> t.Tuple[str, ...]:
         """
-        Same as self.parts except generalized so that any dynamic parts do not
+        Same as :py:attr:`~sanic_routing.route.Route.parts` except
+        generalized so that any dynamic parts do not
         include param keys since they have no impact on routing.
         """
         return tuple(
@@ -255,7 +288,8 @@ class Route:
     @property
     def uri(self):
         """
-        Since self.path does NOT include a preceding '/', this adds it back.
+        Since :py:attr:`~sanic_routing.route.Route.path` does NOT
+        include a preceding '/', this adds it back.
         """
         return f"{self.router.delimiter}{self.path}"
 

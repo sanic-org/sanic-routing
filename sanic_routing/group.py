@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import FrozenSet, List, Sequence
+from typing import FrozenSet, List, Optional, Sequence, Tuple
 
 from sanic_routing.route import Requirements, Route
 from sanic_routing.utils import Immutable
@@ -24,6 +24,37 @@ class RouteGroup:
         "unquote",
         "uri",
     )
+
+    #: The _reconstructed_ path after the Route has been normalized.
+    #: Does not contain preceding ``/``  (see also
+    #: :py:attr:`uri`)
+    path: str
+
+    #: A regex version of the :py:attr:`~sanic_routing.route.Route.path`
+    pattern: Optional[str]
+
+    #: Whether the route requires regular expression evaluation
+    regex: bool
+
+    #: The raw version of the path exploded (see also
+    #: :py:attr:`segments`)
+    parts: Tuple[str, ...]
+
+    #: Same as :py:attr:`parts` except
+    #:  generalized so that any dynamic parts do not
+    #:  include param keys since they have no impact on routing.
+    segments: Tuple[str, ...]
+
+    #: Whether the route should be matched with strict evaluation
+    strict: bool
+
+    #: Whether the route should be unquoted after matching if (for example) it
+    #: is suspected to contain non-URL friendly characters
+    unquote: bool
+
+    #: Since :py:attr:`path` does NOT
+    #:  include a preceding '/', this adds it back.
+    uri: str
 
     def __init__(self, *routes) -> None:
         if len(set(route.parts for route in routes)) > 1:
@@ -83,6 +114,8 @@ class RouteGroup:
         The purpose of merge is to group routes with the same path, but
         declarared individually. In other words to group these:
 
+        .. code-block:: python
+
             @app.get("/path/to")
             def handler1(...):
                 ...
@@ -134,6 +167,9 @@ class RouteGroup:
 
     @property
     def depth(self) -> int:
+        """
+        The number of parts in :py:attr:`parts`
+        """
         return len(self[0].parts)
 
     @property
@@ -145,6 +181,7 @@ class RouteGroup:
 
     @property
     def methods(self) -> FrozenSet[str]:
+        """"""
         return frozenset(
             [method for route in self for method in route.methods]
         )
