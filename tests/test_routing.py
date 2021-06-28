@@ -429,3 +429,44 @@ def test_multiple_handlers_on_final_regex_segment(handler):
     _, handler, params = router.get("/path/to/bar", "three")
     assert handler() == "handler2"
     assert params == {"foo": "bar"}
+
+
+def test_identical_path_routes_with_different_methods(handler):
+    def handler1():
+        return "handler1"
+
+    def handler2():
+        return "handler2"
+
+    #test root level path with different methods
+    router1 = Router()
+    router1.add("/<foo:path>", handler1, methods=["GET", "OPTIONS"])
+    router1.add("/<foo:path>", handler2, methods=["POST"])
+    router1.finalize()
+
+    _, handler, params = router1.get("/a/random/path", "POST")
+    assert handler() == "handler2"
+    assert params == {"foo": "a/random/path"}
+
+    _, handler, params = router1.get("/a/random/path", "GET")
+    assert handler() == "handler1"
+    assert params == {"foo": "a/random/path"}
+
+    #a more complex test
+    router2 = Router()
+    router2.add("/<foo:path>", handler1, methods=["OPTIONS"])
+    router2.add("/api/<version:int>/hello_world/", handler2, methods=["POST"])
+    router2.add("/api/<version:int>/hello_world/<foo:path>", handler2, methods=["GET"])
+    router2.finalize()
+
+    _, handler, params = router2.get("/a/random/path", "OPTIONS")
+    assert handler() == "handler1"
+    assert params == {"foo": "a/random/path"}
+
+    _, handler, params = router2.get("/api/3/hello_world/", "POST")
+    assert handler() == "handler2"
+    assert params == {"version": 3}
+
+    _, handler, params = router2.get("/api/3/hello_world/results/1488", "GET")
+    assert handler() == "handler2"
+    assert params == {"version": 3, "foo": "results/1488"}
