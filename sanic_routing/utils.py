@@ -60,7 +60,7 @@ def path_to_parts(path, delimiter="/"):
     return tuple(
         part if part.startswith("<") else quote(part)
         for part in re.split(
-            rf"{delimiter}(?=[^>]*(?:<|$))", path))
+            rf"{delimiter}(?=[^>]*(?:<(?<!\?<)|$))", path))
 
 
 def parts_to_path(parts, delimiter="/"):

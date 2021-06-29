@@ -18,6 +18,8 @@ from sanic_routing.utils import path_to_parts
         ("test", "<rest:a(?>bc|b)c>", ""),
         ("test", "<rest:[a-z]{10}/extra)?>"),
         ("path", "to", r"<deeply_nested:[a-z/]+>", "thing"),
+        (r"<filename:[^/]?.*?\.js>",),
+        (r"<filename:[^/]?.*?(?<!js)>",),
     )
 )
 def test_path_to_parts_splitter(parts):
@@ -41,6 +43,8 @@ def test_path_to_parts_splitter(parts):
          r"<size:max|\d+\.|\.\d+|\d+\.\d+>", "<rotation:int>", "default"),
         ("test", "<rest:a(?>bc|b)c>"),
         ("test", r"<rest:[a-z]{10}extra\..+)?>", "<fest>"),
+        (r"<filename:[^.]?.*?\.js>",),
+        (r"<filename:[^.]?.*?(?<!js)>",),
     )
 )
 def test_path_to_parts_splitter_dot_delimiter(parts):
