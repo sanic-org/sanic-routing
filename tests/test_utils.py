@@ -6,6 +6,7 @@ from sanic_routing.utils import path_to_parts
 @pytest.mark.parametrize(
     "parts",
     (
+        ("",),
         ("foo",),
         ("foo", "<user>", "<user:str>", ""),
         ("foo", "<id:int>", "bar", r"<name:[A-z]+>"),
@@ -45,3 +46,17 @@ def test_path_to_parts_splitter(parts):
 def test_path_to_parts_splitter_dot_delimiter(parts):
     path = ".".join(parts)
     assert path_to_parts(path, delimiter=".") == parts, path
+
+
+@pytest.mark.parametrize(
+    "path,parts",
+    (
+        ("no/start/slash/", ("no", "start", "slash", "")),
+        ("/%E4%BD%A0%E5%A5%BD/hello", ("%E4%BD%A0%E5%A5%BD", "hello")),
+        ("/πάτι/ᴄᴏᴅᴇ", ("%CF%80%CE%AC%CF%84%CE%B9", "%E1%B4%84%E1%B4%8F%E1%B4%85%E1%B4%87")),
+        ("/юзер/<user>/<name:str>/", ("%D1%8E%D0%B7%D0%B5%D1%80", "<user>", "<name:str>", "")),
+        (r"/ru/<ext:файл\.(?P<ext>txt)>/<ext:[a-z]>", ("ru", "<ext:файл\.(?P<ext>txt)>", "<ext:[a-z]>")),
+    )
+)
+def test_path_to_parts_splitter_normalization(path, parts):
+    assert path_to_parts(path) == parts, path
