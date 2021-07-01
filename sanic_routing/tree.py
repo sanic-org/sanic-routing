@@ -280,7 +280,8 @@ class Node:
 
         location.extend(lines)
 
-    def _inject_method_check(self, location, indent, group):
+    @staticmethod
+    def _inject_method_check(location, indent, group):
         """
         Sometimes we need to check the routing methods inside the generated src
         """

@@ -18,7 +18,7 @@ from .exceptions import (
 from .line import Line
 from .patterns import REGEX_TYPES
 from .route import Route
-from .tree import Tree
+from .tree import Node, Tree
 from .utils import parts_to_path, path_to_parts
 
 # The below functions might be called by the compiled source code, and
@@ -343,12 +343,16 @@ class BaseRouter(ABC):
         :return: list of routes that have no path, but do need matching
         :rtype: List[RouteGroup]
         """
-        return [
-            group
-            for group in list(self.dynamic_routes.values())
-            + list(self.regex_routes.values())
-            if group.dynamic_path is has_dynamic_path
-        ]
+        return sorted(
+            [
+                group
+                for group in list(self.dynamic_routes.values())
+                + list(self.regex_routes.values())
+                if group.dynamic_path is has_dynamic_path
+            ],
+            key=lambda x: x.depth,
+            reverse=True,
+        )
 
     def _generate_tree(self) -> None:
         self.tree.generate(self._get_non_static_non_path_groups(False))
@@ -418,6 +422,11 @@ class BaseRouter(ABC):
             route_container = (
                 "regex_routes" if group.regex else "dynamic_routes"
             )
+            route_idx: t.Union[str, int] = 0
+
+            if len(group.routes) > 1:
+                route_idx = "route_idx"
+                Node._inject_method_check(src, 1, group)
 
             src.extend(
                 [
@@ -433,7 +442,7 @@ class BaseRouter(ABC):
                     Line(
                         (
                             f"return router.{route_container}"
-                            f"[{group.segments}][0], basket"
+                            f"[{group.segments}][{route_idx}], basket"
                         ),
                         2,
                     ),
