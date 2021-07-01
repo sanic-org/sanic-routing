@@ -430,3 +430,55 @@ def test_multiple_handlers_on_final_regex_segment(handler):
     _, handler, params = router.get("/path/to/bar", "three")
     assert handler() == "handler2"
     assert params == {"foo": "bar"}
+
+
+@pytest.mark.parametrize("uri", ("a-random-path", "a/random/path"))
+def test_identical_path_routes_with_different_methods_simple(uri):
+    def handler1():
+        return "handler1"
+
+    def handler2():
+        return "handler2"
+
+    # test root level path with different methods
+    router = Router()
+    router.add("/<foo:path>", handler1, methods=["GET", "OPTIONS"])
+    router.add("/<foo:path>", handler2, methods=["POST"])
+    router.finalize()
+
+    _, handler, params = router.get(f"/{uri}", "POST")
+    assert handler() == "handler2"
+    assert params == {"foo": f"{uri}"}
+
+    _, handler, params = router.get(f"/{uri}", "GET")
+    assert handler() == "handler1"
+    assert params == {"foo": f"{uri}"}
+
+
+@pytest.mark.parametrize("uri", ("a-random-path", "a/random/path"))
+def test_identical_path_routes_with_different_methods_complex(uri):
+    def handler1():
+        return "handler1"
+
+    def handler2():
+        return "handler2"
+
+    router = Router()
+    router.add("/<foo:path>", handler1, methods=["OPTIONS"])
+    router.add("/api/<version:int>/hello_world", handler2, methods=["POST"])
+    router.add(
+        "/api/<version:int>/hello_world/<foo:path>", handler2, methods=["GET"]
+    )
+    router.finalize()
+
+    _, handler, params = router.get(f"/{uri}", "OPTIONS")
+    assert handler() == "handler1"
+    assert params == {"foo": uri}
+
+    _, handler, params = router.get("/api/3/hello_world", "POST")
+    assert handler() == "handler2"
+    assert params == {"version": 3}
+
+    _, handler, params = router.get(f"/api/3/hello_world/{uri}", "GET")
+    assert handler() == "handler2"
+    assert params == {"version": "3", "foo": uri}
