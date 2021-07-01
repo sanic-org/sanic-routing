@@ -138,7 +138,6 @@ class BaseRouter(ABC):
         methods: t.Optional[
             t.Union[t.Sequence[str], t.FrozenSet[str], str]
         ] = None,
-        methods: t.Optional[t.Union[t.Sequence[str], str]] = None,
         name: t.Optional[str] = None,
         requirements: t.Optional[t.Dict[str, t.Any]] = None,
         strict: bool = False,
