@@ -138,6 +138,7 @@ class BaseRouter(ABC):
         methods: t.Optional[
             t.Union[t.Sequence[str], t.FrozenSet[str], str]
         ] = None,
+        methods: t.Optional[t.Union[t.Sequence[str], str]] = None,
         name: t.Optional[str] = None,
         requirements: t.Optional[t.Dict[str, t.Any]] = None,
         strict: bool = False,
@@ -290,7 +291,7 @@ class BaseRouter(ABC):
             some optimizations, defaults to False
         :type do_optimize: bool, optional
         :raises FinalizationError: Cannot finalize if there are no routes, or
-        the router has already been finalized (can call reset() to undo it)
+            the router has already been finalized (can call reset() to undo it)
         """
         if self.finalized:
             raise FinalizationError("Cannot finalize router more than once.")
