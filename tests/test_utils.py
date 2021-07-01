@@ -1,4 +1,5 @@
 import pytest
+
 from sanic_routing.utils import path_to_parts
 
 
