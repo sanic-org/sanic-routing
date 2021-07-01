@@ -46,7 +46,7 @@ class Route:
         raw_path: str,
         name: str,
         handler: t.Callable[..., t.Any],
-        methods: t.Iterable[str],
+        methods: t.Union[t.Sequence[str], t.FrozenSet[str]],
         requirements: t.Dict[str, t.Any] = None,
         strict: bool = False,
         unquote: bool = False,
