@@ -423,7 +423,7 @@ class BaseRouter(ABC):
                 "regex_routes" if group.regex else "dynamic_routes"
             )
             route_idx: t.Union[str, int] = 0
-            holder = []
+            holder: t.List[Line] = []
 
             if len(group.routes) > 1:
                 route_idx = "route_idx"
