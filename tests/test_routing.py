@@ -482,3 +482,25 @@ def test_identical_path_routes_with_different_methods_complex(uri):
     _, handler, params = router.get(f"/api/3/hello_world/{uri}", "GET")
     assert handler() == "handler2"
     assert params == {"version": "3", "foo": uri}
+
+
+@pytest.mark.parametrize("uri", ("a-random-path", "a/random/path"))
+def test_identical_path_routes_with_different_methods_similar_urls(uri):
+    def handler1():
+        return "handler1"
+
+    # test root level path with different methods
+    router = Router()
+    router.add("/constant/<foo:path>/story", handler1, methods=["GET", "OPTIONS"])
+    router.add("/constant/<foo:path>/tracker/events", handler1, methods=["PUT"])
+    router.add("/constant/<foo:path>/tracker/events", handler1, methods=["POST"])
+    router.finalize()
+
+    _, handler, params = router.get(f"/constant/{uri}/story", "GET")
+    assert params == {"foo": f"{uri}"}
+
+    _, handler, params = router.get(f"/constant/{uri}/tracker/events", "PUT")
+    assert params == {"foo": f"{uri}"}
+
+    _, handler, params = router.get(f"/constant/{uri}/tracker/events", "POST")
+    assert params == {"foo": f"{uri}"}
