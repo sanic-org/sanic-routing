@@ -1,9 +1,9 @@
 import re
 import uuid
-from datetime import datetime
+from datetime import date, datetime
 
 
-def parse_date(d):
+def parse_date(d) -> date:
     return datetime.strptime(d, "%Y-%m-%d").date()
 
 
