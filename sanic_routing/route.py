@@ -4,7 +4,7 @@ from types import SimpleNamespace
 from warnings import warn
 
 from .exceptions import InvalidUsage, ParameterNameConflicts
-from .parameter import ParamInfo
+from .patterns import ParamInfo
 from .utils import Immutable, parts_to_path, path_to_parts
 
 

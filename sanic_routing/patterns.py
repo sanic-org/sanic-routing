@@ -1,11 +1,11 @@
 import re
+import typing as t
 import uuid
 from datetime import datetime
+from types import SimpleNamespace
 from typing import Any, Callable, Dict, Pattern, Tuple, Type
 
 from sanic_routing.exceptions import InvalidUsage, NotFound
-
-from .parameter import ParamInfo
 
 
 def parse_date(d):
@@ -24,16 +24,11 @@ def slug(param: str) -> str:
     return param
 
 
-def ext(param: str) -> Tuple[str, str]:
-    if not param.count(".") >= 1:
-        raise ValueError(f"Value {param} does not match the ext format")
-    name, ext = param.rsplit(".", 1)
-    if not ext.isalnum():
-        raise ValueError(f"Value {param} does not match the ext format")
-    return name, ext
+def ext(param: str) -> Tuple[str, ...]:
+    return tuple(param.split("."))
 
 
-class ExtParamInfo(ParamInfo):
+class ParamInfo:
     __slots__ = (
         "cast",
         "ctx",
@@ -43,33 +38,67 @@ class ExtParamInfo(ParamInfo):
         "priority",
         "raw_path",
         "regex",
-        "name_type",
-        "ext_type",
     )
 
+    def __init__(
+        self,
+        name: str,
+        raw_path: str,
+        label: str,
+        cast: t.Callable[[str], t.Any],
+        pattern: re.Pattern,
+        regex: bool,
+        priority: int,
+    ) -> None:
+        self.name = name
+        self.raw_path = raw_path
+        self.label = label
+        self.cast = cast
+        self.pattern = pattern
+        self.regex = regex
+        self.priority = priority
+        self.ctx = SimpleNamespace()
+
+    def process(
+        self,
+        params: t.Dict[str, t.Any],
+        value: t.Union[str, t.Tuple[str, ...]],
+    ) -> None:
+        ...
+
+
+class ExtParamInfo(ParamInfo):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
         match = REGEX_PARAM_NAME_EXT.match(self.raw_path)
-        self.name_type = match.group(2)
-        self.ext_type = match.group(3)
-        # definition = self.raw_path[1:-1]
-        # parts = definition.split(":")
-        regex_type = REGEX_TYPES.get(self.name_type)
+        ext_type = match.group(3)
+
+        regex_type = REGEX_TYPES.get(match.group(2))
         self.ctx.cast = None
         if regex_type:
             self.ctx.cast = regex_type[0]
         self.ctx.allowed = []
-        if self.ext_type:
-            self.ctx.allowed = self.ext_type.split("|")
-            if not all(ext.isalnum() for ext in self.ctx.allowed):
+        self.ctx.allowed_sub_count = 0
+        if ext_type:
+            self.ctx.allowed = ext_type.split("|")
+            allowed_subs = {allowed.count(".") for allowed in self.ctx.allowed}
+            if len(allowed_subs) > 1:
                 raise InvalidUsage(
-                    "Extensions may only be alphabetic characters"
+                    "All allowed extensions within a single route definition "
+                    "must contain the same number of subparts. For example: "
+                    "<foo:ext=js|css> and <foo:ext=min.js|min.css> are both "
+                    "acceptable, but <foo:ext=js|min.js> is not."
                 )
-        # elif len(parts) >= 3:
-        #     raise InvalidUsage(f"Invalid ext definition: {self.raw_path}")
+            self.ctx.allowed_sub_count = next(iter(allowed_subs))
+
+            for extension in self.ctx.allowed:
+                if not REGEX_ALLOWED_EXTENSION.match(extension):
+                    raise InvalidUsage(f"Invalid extension: {extension}")
 
     def process(self, params, value):
-        filename, ext = value
+        stop = -1 * (self.ctx.allowed_sub_count + 1)
+        filename = ".".join(value[:stop])
+        ext = ".".join(value[stop:])
         if self.ctx.allowed and ext not in self.ctx.allowed:
             raise NotFound(f"Invalid extension: {ext}")
         if self.ctx.cast:
@@ -81,10 +110,12 @@ class ExtParamInfo(ParamInfo):
         params["ext"] = ext
 
 
+EXTENSION = r"[a-z0-9](?:[a-z0-9\.]*[a-z0-9])?"
 REGEX_PARAM_NAME = re.compile(r"^<([a-zA-Z_][a-zA-Z0-9_]*)(?::(.*))?>$")
 REGEX_PARAM_NAME_EXT = re.compile(
-    r"^<([a-zA-Z_][a-zA-Z0-9_]*)(?:=([a-z]+))?(?::ext(?:=([a-z|]+))?)>$"
+    r"^<([a-zA-Z_][a-zA-Z0-9_]*)(?:=([a-z]+))?(?::ext(?:=([a-z0-9|\.]+))?)>$"
 )
+REGEX_ALLOWED_EXTENSION = re.compile(r"^" + EXTENSION + r"$")
 
 # Predefined path parameter types. The value is a tuple consisteing of a
 # callable and a compiled regular expression.
@@ -100,7 +131,7 @@ REGEX_TYPES_ANNOTATION = Dict[
 REGEX_TYPES: REGEX_TYPES_ANNOTATION = {
     "string": (str, re.compile(r"^[^/]+$"), ParamInfo),
     "str": (str, re.compile(r"^[^/]+$"), ParamInfo),
-    "ext": (ext, re.compile(r"^[^/]+$"), ExtParamInfo),
+    "ext": (ext, re.compile(r"^[^/]+\." + EXTENSION + r"$"), ExtParamInfo),
     "slug": (slug, re.compile(r"^[a-z0-9]+(?:-[a-z0-9]+)*$"), ParamInfo),
     "alpha": (alpha, re.compile(r"^[A-Za-z]+$"), ParamInfo),
     "path": (str, re.compile(r"^[^/]?.*?$"), ParamInfo),

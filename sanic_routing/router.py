@@ -7,7 +7,7 @@ from types import SimpleNamespace
 from warnings import warn
 
 from sanic_routing.group import RouteGroup
-from sanic_routing.parameter import ParamInfo
+from sanic_routing.patterns import ParamInfo
 
 from .exceptions import (
     BadMethod,
