@@ -71,12 +71,21 @@ class ExtParamInfo(ParamInfo):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
         match = REGEX_PARAM_NAME_EXT.match(self.raw_path)
+        if match.group(2) == "path":
+            raise InvalidUsage(
+                "Extension parameter matching does not support the "
+                "`path` type."
+            )
         ext_type = match.group(3)
-
         regex_type = REGEX_TYPES.get(match.group(2))
         self.ctx.cast = None
         if regex_type:
             self.ctx.cast = regex_type[0]
+        elif match.group(2):
+            raise InvalidUsage(
+                "Extension parameter matching only supports filename matching "
+                "on known parameter types, and not regular expressions."
+            )
         self.ctx.allowed = []
         self.ctx.allowed_sub_count = 0
         if ext_type:

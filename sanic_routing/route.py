@@ -355,13 +355,8 @@ class Route:
                 )
 
         default = (str, label, ParamInfo)
+
         # Pull from pre-configured types
-        found = self.router.regex_types.get(label)
-        if not found:
-            # if ":" in label:
-            #     label, _ = label.split(":", 1)
-            #     found = self.router.regex_types.get(label, default)
-            # else:
-            found = default
+        found = self.router.regex_types.get(label, default)
         _type, pattern, param_info_class = found
         return name, label, _type, pattern, param_info_class
