@@ -47,7 +47,6 @@ setup_kwargs = {
         "Programming Language :: Python :: 3.10",
     ],
 }
-requirements = []
 
 tests_require = ["pytest", "sanic", "pytest-asyncio"]
 
