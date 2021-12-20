@@ -3,7 +3,7 @@ from logging import getLogger
 
 from .group import RouteGroup
 from .line import Line
-from .patterns import REGEX_PARAM_NAME
+from .patterns import REGEX_PARAM_NAME, REGEX_PARAM_NAME_EXT
 
 logger = getLogger("sanic.root")
 
@@ -440,7 +440,9 @@ class Tree:
                 param = None
                 dynamic = part.startswith("<")
                 if dynamic:
-                    if not REGEX_PARAM_NAME.match(part):
+                    if not REGEX_PARAM_NAME.match(
+                        part
+                    ) and not REGEX_PARAM_NAME_EXT.match(part):
                         raise ValueError(f"Invalid declaration: {part}")
                     part = f"__dynamic__:{group.params[level].label}"
                     param = group.params[level]

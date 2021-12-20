@@ -34,29 +34,57 @@ def ext(param: str) -> Tuple[str, str]:
 
 
 class ExtParamInfo(ParamInfo):
+    __slots__ = (
+        "cast",
+        "ctx",
+        "label",
+        "name",
+        "pattern",
+        "priority",
+        "raw_path",
+        "regex",
+        "name_type",
+        "ext_type",
+    )
+
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
-        definition = self.raw_path[1:-1]
-        parts = definition.split(":")
+        match = REGEX_PARAM_NAME_EXT.match(self.raw_path)
+        self.name_type = match.group(2)
+        self.ext_type = match.group(3)
+        # definition = self.raw_path[1:-1]
+        # parts = definition.split(":")
+        regex_type = REGEX_TYPES.get(self.name_type)
+        self.ctx.cast = None
+        if regex_type:
+            self.ctx.cast = regex_type[0]
         self.ctx.allowed = []
-        if len(parts) == 3:
-            self.ctx.allowed = parts[2].split("|")
+        if self.ext_type:
+            self.ctx.allowed = self.ext_type.split("|")
             if not all(ext.isalnum() for ext in self.ctx.allowed):
                 raise InvalidUsage(
                     "Extensions may only be alphabetic characters"
                 )
-        elif len(parts) >= 3:
-            raise InvalidUsage(f"Invalid ext definition: {self.raw_path}")
+        # elif len(parts) >= 3:
+        #     raise InvalidUsage(f"Invalid ext definition: {self.raw_path}")
 
     def process(self, params, value):
         filename, ext = value
         if self.ctx.allowed and ext not in self.ctx.allowed:
             raise NotFound(f"Invalid extension: {ext}")
+        if self.ctx.cast:
+            try:
+                filename = self.ctx.cast(filename)
+            except ValueError:
+                raise NotFound(f"Invalid filename: {filename}")
         params[self.name] = filename
         params["ext"] = ext
 
 
 REGEX_PARAM_NAME = re.compile(r"^<([a-zA-Z_][a-zA-Z0-9_]*)(?::(.*))?>$")
+REGEX_PARAM_NAME_EXT = re.compile(
+    r"^<([a-zA-Z_][a-zA-Z0-9_]*)(?:=([a-z]+))?(?::ext(?:=([a-z|]+))?)>$"
+)
 
 # Predefined path parameter types. The value is a tuple consisteing of a
 # callable and a compiled regular expression.

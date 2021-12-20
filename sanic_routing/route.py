@@ -327,8 +327,13 @@ class Route:
         parameter_string = parameter_string.strip("<>")
         name = parameter_string
         label = "str"
+
         if ":" in parameter_string:
             name, label = parameter_string.split(":", 1)
+            if "=" in label:
+                label, _ = label.split("=", 1)
+            if "=" in name:
+                name, _ = name.split("=", 1)
 
             if not name:
                 raise ValueError(
@@ -353,10 +358,10 @@ class Route:
         # Pull from pre-configured types
         found = self.router.regex_types.get(label)
         if not found:
-            if ":" in label:
-                label, _ = label.split(":", 1)
-                found = self.router.regex_types.get(label, default)
-            else:
-                found = default
+            # if ":" in label:
+            #     label, _ = label.split(":", 1)
+            #     found = self.router.regex_types.get(label, default)
+            # else:
+            found = default
         _type, pattern, param_info_class = found
         return name, label, _type, pattern, param_info_class

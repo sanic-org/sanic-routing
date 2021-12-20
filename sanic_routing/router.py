@@ -109,7 +109,7 @@ class BaseRouter(ABC):
         # on param_basket["__params__"]
         params = param_basket["__params__"]
 
-        if not params:
+        if not params or param_basket["__matches__"]:
             # If param_basket["__params__"] does not exist, we might have
             # param_basket["__matches__"], which are indexed based matches
             # on path segments. They should already be cast types.

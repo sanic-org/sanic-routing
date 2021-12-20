@@ -1,7 +1,7 @@
 import re
 from urllib.parse import quote, unquote
 
-from .patterns import REGEX_PARAM_NAME
+from .patterns import REGEX_PARAM_NAME, REGEX_PARAM_NAME_EXT
 
 
 class Immutable(dict):
@@ -74,7 +74,21 @@ def parts_to_path(parts, delimiter="/"):
                     param_type = f":{match.group(2)}"
                 path.append(f"<{match.group(1)}{param_type}>")
             except AttributeError:
-                raise ValueError(f"Invalid declaration: {part}")
+                try:
+                    match = REGEX_PARAM_NAME_EXT.match(part)
+                    filename_type = ""
+                    extension_type = ""
+                    if match.group(2):
+                        filename_type = f"={match.group(2)}"
+                    if match.group(3):
+                        extension_type = f"={match.group(3)}"
+                    segment = (
+                        f"<{match.group(1)}{filename_type}:"
+                        f"ext{extension_type}>"
+                    )
+                    path.append(segment)
+                except AttributeError:
+                    raise ValueError(f"Invalid declaration: {part}")
         else:
             path.append(part)
     return delimiter.join(path)
