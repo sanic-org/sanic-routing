@@ -2,7 +2,6 @@ import uuid
 from datetime import date
 
 import pytest
-
 from sanic_routing import BaseRouter
 from sanic_routing.exceptions import NoMethod, NotFound, RouteExists
 
@@ -118,7 +117,6 @@ def test_cast_types_at_same_position(handler):
     (
         ("str", "foo_-", str),
         ("int", 11111, int),
-        ("number", 99.99, float),
         ("alpha", "ABCxyz", str),
         ("ymd", "2021-01-01", date),
         ("uuid", uuid.uuid4(), uuid.UUID),
@@ -129,7 +127,6 @@ def test_casting(handler, label, value, cast_type):
     router = Router()
     router.add("/<str:str>", handler)
     router.add("/<int:int>", handler)
-    router.add("/<number:number>", handler)
     router.add("/<alpha:alpha>", handler)
     router.add("/<ymd:ymd>", handler)
     router.add("/<uuid:uuid>", handler)
@@ -497,9 +494,15 @@ def test_identical_path_routes_with_different_methods_similar_urls(uri):
 
     # test root level path with different methods
     router = Router()
-    router.add("/constant/<foo:path>/story", handler1, methods=["GET", "OPTIONS"])
-    router.add("/constant/<foo:path>/tracker/events", handler2, methods=["PUT"])
-    router.add("/constant/<foo:path>/tracker/events", handler3, methods=["POST"])
+    router.add(
+        "/constant/<foo:path>/story", handler1, methods=["GET", "OPTIONS"]
+    )
+    router.add(
+        "/constant/<foo:path>/tracker/events", handler2, methods=["PUT"]
+    )
+    router.add(
+        "/constant/<foo:path>/tracker/events", handler3, methods=["POST"]
+    )
     router.finalize()
 
     route, handler, params = router.get(f"/constant/{uri}/story", "GET")
