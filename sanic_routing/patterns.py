@@ -30,12 +30,10 @@ REGEX_PARAM_NAME = re.compile(r"^<([a-zA-Z_][a-zA-Z0-9_]*)(?::(.*))?>$")
 # The regular expression is generally NOT used. Unless the path is forced
 # to use regex patterns.
 REGEX_TYPES = {
-    "string": (str, re.compile(r"^[^/]+$")),
     "str": (str, re.compile(r"^[^/]+$")),
     "slug": (slug, re.compile(r"^[a-z0-9]+(?:-[a-z0-9]+)*$")),
     "alpha": (alpha, re.compile(r"^[A-Za-z]+$")),
     "path": (str, re.compile(r"^[^/]?.*?$")),
-    "number": (float, re.compile(r"^-?(?:\d+(?:\.\d*)?|\.\d+)$")),
     "float": (float, re.compile(r"^-?(?:\d+(?:\.\d*)?|\.\d+)$")),
     "int": (int, re.compile(r"^-?\d+$")),
     "ymd": (
