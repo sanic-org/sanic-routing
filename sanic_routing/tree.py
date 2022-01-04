@@ -322,7 +322,8 @@ class Node:
             ]
         )
 
-    def _inject_requirements(self, location, indent, group):
+    @staticmethod
+    def _inject_requirements(location, indent, group):
         """
         Check any extra checks needed for a route. In path routing, for exampe,
         this is used for matching vhosts.

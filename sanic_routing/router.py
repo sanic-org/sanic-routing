@@ -425,7 +425,10 @@ class BaseRouter(ABC):
             route_idx: t.Union[str, int] = 0
             holder: t.List[Line] = []
 
-            if len(group.routes) > 1:
+            if group.requirements:
+                route_idx = "route_idx"
+                Node._inject_requirements(holder, 2, group)
+            elif len(group.routes) > 1:
                 route_idx = "route_idx"
                 Node._inject_method_check(holder, 2, group)
 
