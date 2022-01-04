@@ -329,15 +329,13 @@ class Node:
         """
         for k, route in enumerate(group):
             conditional = "if" if k == 0 else "elif"
+            match = f'method in {route.methods}'
+            for req_name, req_value in route.requirements.items():
+                match += f' and extra.get({req_name!r}) == {req_value!r}'
+
             location.extend(
                 [
-                    Line(
-                        (
-                            f"{conditional} extra == {route.requirements} "
-                            f"and method in {route.methods}:"
-                        ),
-                        indent,
-                    ),
+                    Line((f"{conditional} {match}:"), indent),
                     Line((f"route_idx = {k}"), indent + 1),
                 ]
             )

@@ -84,7 +84,7 @@ class BaseRouter(ABC):
                 method,
                 self,
                 {"__params__": {}, "__matches__": {}},
-                extra,
+                extra or {},
             )
         except (NotFound, NoMethod) as e:
             # If we did not find the route, we might need to try routing one

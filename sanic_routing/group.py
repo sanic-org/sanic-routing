@@ -66,7 +66,7 @@ class RouteGroup:
         route_list = list(routes)
         route_list.pop()
 
-        self._routes = routes
+        self._routes = tuple(sorted(routes, key=self._sorting))
         self.pattern_idx = 0
 
     def __str__(self):
@@ -145,15 +145,14 @@ class RouteGroup:
         _routes = list(self._routes)
         for other_route in group.routes:
             for current_route in self:
+                requirements_overlap = set(current_route.requirements)
+                requirements_overlap &= set(other_route.requirements)
                 if (
                     current_route == other_route
                     or (
                         current_route.requirements
-                        and not other_route.requirements
-                    )
-                    or (
-                        not current_route.requirements
                         and other_route.requirements
+                        and not requirements_overlap
                     )
                 ) and not append:
                     if not overwrite:
@@ -163,7 +162,7 @@ class RouteGroup:
                         )
                 else:
                     _routes.append(other_route)
-        self._routes = tuple(_routes)
+        self._routes = tuple(sorted(_routes, key=self._sorting))
 
     @property
     def depth(self) -> int:
@@ -193,3 +192,10 @@ class RouteGroup:
     @property
     def requirements(self) -> List[Requirements]:
         return [route.requirements for route in self if route.requirements]
+
+    def _sorting(self, item) -> int:
+        """
+        Within a group, we want to evaluate routes based on their number of
+        requirements to meet, so more specific requirements are matched first
+        """
+        return -len(item.requirements)
