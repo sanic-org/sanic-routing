@@ -241,8 +241,7 @@ class BaseRouter(ABC):
             if route.segments in routes:
                 existing_group = routes[route.segments]
                 group.merge(existing_group, overwrite, append)
-
-            routes[route.segments] = group
+        routes[route.segments] = group
 
         if name:
             self.name_index[name] = route
