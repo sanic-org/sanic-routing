@@ -1,6 +1,8 @@
 import re
 from urllib.parse import quote, unquote
 
+from sanic_routing.exceptions import InvalidUsage
+
 from .patterns import REGEX_PARAM_NAME, REGEX_PARAM_NAME_EXT
 
 
@@ -88,7 +90,7 @@ def parts_to_path(parts, delimiter="/"):
                     )
                     path.append(segment)
                 except AttributeError:
-                    raise ValueError(f"Invalid declaration: {part}")
+                    raise InvalidUsage(f"Invalid declaration: {part}")
         else:
             path.append(part)
     return delimiter.join(path)

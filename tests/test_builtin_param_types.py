@@ -1,4 +1,5 @@
 import pytest
+
 from sanic_routing import BaseRouter
 from sanic_routing.exceptions import InvalidUsage, NotFound
 
@@ -159,7 +160,7 @@ def test_ext_single_defined_matches(value):
 
     router = Router()
 
-    router.add("/<filename:ext:mp3>", handler)
+    router.add("/<filename:ext=mp3>", handler)
     router.finalize()
 
     _, handler, params = router.get(f"/{value}", "BASE")
@@ -180,7 +181,7 @@ def test_ext_multiple_defined_matches(value):
 
     router = Router()
 
-    router.add("/<filename:ext:jpg|png|gif>", handler)
+    router.add("/<filename:ext=jpg|png|gif>", handler)
     router.finalize()
 
     _, handler, params = router.get(f"/{value}", "BASE")
@@ -189,6 +190,30 @@ def test_ext_multiple_defined_matches(value):
     filename, ext = value.rsplit(".", 1)
     assert retval["filename"] == filename
     assert retval["ext"] == ext
+
+
+@pytest.mark.parametrize(
+    "path",
+    (
+        "/<filename=int:ext>",
+        "/<filename=int:ext=txt>",
+        "/<filename=int:ext=txt|csv>",
+    ),
+)
+def test_ext_multiple_defined_filename_types(path):
+    def handler(**kwargs):
+        return kwargs
+
+    router = Router()
+
+    router.add(path, handler)
+    router.finalize()
+
+    _, handler, params = router.get("/123.txt", "BASE")
+    retval = handler(**params)
+
+    assert retval["filename"] == 123
+    assert retval["ext"] == "txt"
 
 
 @pytest.mark.parametrize(
@@ -218,7 +243,7 @@ def test_ext_single_defined_no_matches(handler, value):
 
     router = Router()
 
-    router.add("/<filename:ext:txt>", handler)
+    router.add("/<filename:ext=txt>", handler)
     router.finalize()
 
     with pytest.raises(NotFound):
@@ -235,7 +260,7 @@ def test_ext_multiple_defined_no_matches(handler, value):
 
     router = Router()
 
-    router.add("/<filename:ext:jpg|png|gif>", handler)
+    router.add("/<filename:ext=jpg|png|gif>", handler)
     router.finalize()
 
     with pytest.raises(NotFound):
@@ -245,8 +270,12 @@ def test_ext_multiple_defined_no_matches(handler, value):
 @pytest.mark.parametrize(
     "definition",
     (
-        "<filename:ext:and:more>",
-        "<filename:ext:bad#>",
+        "<filename:ext=and:more>",
+        "<filename:ext=and=more>",
+        "<filename:int:ext",
+        "<filename=int|alpha:ext>",
+        "<filename=int=alpha:ext",
+        "<filename:ext=bad#>",
     ),
 )
 def test_bad_ext_definition(handler, definition):

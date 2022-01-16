@@ -114,10 +114,17 @@ class BaseRouter(ABC):
             # param_basket["__matches__"], which are indexed based matches
             # on path segments. They should already be cast types.
             for idx, param in route.params.items():
-                value = param_basket["__matches__"][idx]
+                # If the param index does not exist, then rely upon
+                # the __params__
+                try:
+                    value = param_basket["__matches__"][idx]
+                except KeyError:
+                    continue
+
+                # Apply if tuple (from ext) or if it is not a regex matcher
                 if isinstance(value, tuple):
                     param.process(params, value)
-                else:
+                elif not route.regex:
                     params[param.name] = value
 
         # Double check that if we made a match it is not a false positive

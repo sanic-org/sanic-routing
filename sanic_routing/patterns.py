@@ -1,14 +1,14 @@
 import re
 import typing as t
 import uuid
-from datetime import datetime
+from datetime import date, datetime
 from types import SimpleNamespace
 from typing import Any, Callable, Dict, Pattern, Tuple, Type
 
 from sanic_routing.exceptions import InvalidUsage, NotFound
 
 
-def parse_date(d):
+def parse_date(d) -> date:
     return datetime.strptime(d, "%Y-%m-%d").date()
 
 
@@ -25,7 +25,10 @@ def slug(param: str) -> str:
 
 
 def ext(param: str) -> Tuple[str, ...]:
-    return tuple(param.split("."))
+    parts = tuple(param.split("."))
+    if any(not p for p in parts) or len(parts) == 1:
+        raise ValueError(f"Value {param} does not match filename format")
+    return parts
 
 
 class ParamInfo:
@@ -71,6 +74,10 @@ class ExtParamInfo(ParamInfo):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
         match = REGEX_PARAM_NAME_EXT.match(self.raw_path)
+        if not match:
+            raise InvalidUsage(
+                f"Invalid extension parameter definition: {self.raw_path}"
+            )
         if match.group(2) == "path":
             raise InvalidUsage(
                 "Extension parameter matching does not support the "
@@ -138,13 +145,11 @@ REGEX_TYPES_ANNOTATION = Dict[
     str, Tuple[Callable[[str], Any], Pattern, Type[ParamInfo]]
 ]
 REGEX_TYPES: REGEX_TYPES_ANNOTATION = {
-    "string": (str, re.compile(r"^[^/]+$"), ParamInfo),
     "str": (str, re.compile(r"^[^/]+$"), ParamInfo),
     "ext": (ext, re.compile(r"^[^/]+\." + EXTENSION + r"$"), ExtParamInfo),
     "slug": (slug, re.compile(r"^[a-z0-9]+(?:-[a-z0-9]+)*$"), ParamInfo),
     "alpha": (alpha, re.compile(r"^[A-Za-z]+$"), ParamInfo),
     "path": (str, re.compile(r"^[^/]?.*?$"), ParamInfo),
-    "number": (float, re.compile(r"^-?(?:\d+(?:\.\d*)?|\.\d+)$"), ParamInfo),
     "float": (float, re.compile(r"^-?(?:\d+(?:\.\d*)?|\.\d+)$"), ParamInfo),
     "int": (int, re.compile(r"^-?\d+$"), ParamInfo),
     "ymd": (

@@ -1,5 +1,6 @@
 import re
 import typing as t
+from telnetlib import EC
 from types import SimpleNamespace
 from warnings import warn
 
@@ -223,6 +224,10 @@ class Route:
         self.params = dict(
             sorted(params.items(), key=lambda param: self._sorting(param[1]))
         )
+        if not self.regex and self.raw_path.count(":") > 1:
+            raise InvalidUsage(
+                f"Invalid parameter declaration: {self.raw_path}"
+            )
 
     def _compile_regex(self):
         components = []
