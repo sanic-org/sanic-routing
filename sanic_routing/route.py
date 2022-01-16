@@ -1,6 +1,5 @@
 import re
 import typing as t
-from telnetlib import EC
 from types import SimpleNamespace
 from warnings import warn
 
