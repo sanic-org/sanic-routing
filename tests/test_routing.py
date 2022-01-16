@@ -2,7 +2,6 @@ import uuid
 from datetime import date
 
 import pytest
-
 from sanic_routing import BaseRouter
 from sanic_routing.exceptions import NoMethod, NotFound, RouteExists
 
@@ -457,7 +456,7 @@ def test_identical_path_routes_with_different_methods_simple(uri):
     "uri",
     (
         "a-random-path",
-        # "a/random/path",
+        "a/random/path",
     ),
 )
 def test_identical_path_routes_with_different_methods_complex(uri):
