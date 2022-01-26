@@ -239,7 +239,7 @@ class BaseRouter(ABC):
         return route
 
     def register_pattern(
-        self, label: str, cast: t.Callable[[str], t.Any], pattern: Pattern
+        self, label: str, cast: t.Callable[[str], t.Any], pattern: str
     ):
         """
         Add a custom parameter type to the router. The cast shoud raise a

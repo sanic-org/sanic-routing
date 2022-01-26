@@ -1,4 +1,5 @@
 import ipaddress
+import re
 
 import pytest
 
@@ -64,3 +65,6 @@ def test_bad_registries():
 
     with pytest.raises(InvalidUsage):
         router.register_pattern("ipv4", ipaddress.ip_address, None)
+
+    with pytest.raises(InvalidUsage):
+        router.register_pattern("regex", ipaddress.ip_address, re.compile(".*"))
