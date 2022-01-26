@@ -2,7 +2,6 @@ import ast
 import sys
 import typing as t
 from abc import ABC, abstractmethod
-from re import Pattern
 from types import SimpleNamespace
 from warnings import warn
 
@@ -257,7 +256,7 @@ class BaseRouter(ABC):
         :type cast: t.Callable[[str], t.Any]
         :param pattern: A regular expression that could also match the path
             segment
-        :type pattern: Pattern
+        :type pattern: str
         """
         if not isinstance(label, str):
             raise InvalidUsage(
