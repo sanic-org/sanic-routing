@@ -1,3 +1,5 @@
+from unittest.mock import Mock
+
 import pytest
 from sanic_routing import BaseRouter
 from sanic_routing.exceptions import NotFound
@@ -183,3 +185,50 @@ def test_empty_string(handler, value):
 
     assert isinstance(retval, str)
     assert retval == value
+
+
+def test_nonempty_hierarchy():
+    handler1 = Mock()
+    handler2 = Mock()
+    router = Router()
+
+    router.add("/one/<foo>", handler1)
+    router.add("/one/<foo>/<bar>", handler2)
+    router.finalize()
+
+    _, handler, params = router.get("/one/two/", "BASE")
+    expected = {"foo": "two"}
+    handler(**params)
+
+    assert params == expected
+    handler1.assert_called_once_with(**expected)
+    handler2.assert_not_called()
+
+    handler1.reset_mock()
+    handler2.reset_mock()
+
+    _, handler, params = router.get("/one/two/three/", "BASE")
+    expected = {"foo": "two", "bar": "three"}
+    handler(**params)
+
+    assert params == expected
+    handler1.assert_not_called()
+    handler2.assert_called_once_with(**expected)
+
+
+def test_empty_hierarchy():
+    handler1 = Mock()
+    handler2 = Mock()
+    router = Router()
+
+    router.add("/one/<foo>", handler1)
+    router.add("/one/<foo>/<bar:strorempty>", handler2)
+    router.finalize()
+
+    _, handler, params = router.get("/one/two/", "BASE")
+    expected = {"foo": "two", "bar": ""}
+    handler(**params)
+
+    assert params == expected
+    handler1.assert_not_called()
+    handler2.assert_called_once_with(**expected)
