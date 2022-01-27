@@ -1,5 +1,4 @@
 import pytest
-
 from sanic_routing import BaseRouter
 from sanic_routing.exceptions import NotFound
 
@@ -131,3 +130,56 @@ def test_correct_slug_v_string(handler):
 
     assert isinstance(retval, str)
     assert retval == "FooBar"
+
+
+@pytest.mark.parametrize(
+    "value,matches",
+    (
+        ("foo", True),
+        ("FooBar", True),
+        ("with123456789", True),
+        ("", False),
+    ),
+)
+def test_nonempty_string(handler, value, matches):
+    def test(path):
+        nonlocal handler
+        router = Router()
+
+        router.add(path, handler)
+        router.finalize()
+
+        if matches:
+            _, handler, params = router.get(f"/{value}", "BASE")
+            retval = handler(**params)
+
+            assert isinstance(retval, str)
+            assert retval == value
+        else:
+            with pytest.raises(NotFound):
+                router.get(f"/{value}", "BASE")
+
+    for path in ("/<foo>", "/<foo:str>"):
+        test(path)
+
+
+@pytest.mark.parametrize(
+    "value",
+    (
+        "foo",
+        "FooBar",
+        "with123456789",
+        "",
+    ),
+)
+def test_empty_string(handler, value):
+    router = Router()
+
+    router.add("/<foo:strorempty>", handler)
+    router.finalize()
+
+    _, handler, params = router.get(f"/{value}", "BASE")
+    retval = handler(**params)
+
+    assert isinstance(retval, str)
+    assert retval == value

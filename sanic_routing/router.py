@@ -27,7 +27,7 @@ import re  # noqa  isort:skip
 from datetime import datetime  # noqa  isort:skip
 from urllib.parse import unquote  # noqa  isort:skip
 from uuid import UUID  # noqa  isort:skip
-from .patterns import parse_date, alpha, slug  # noqa  isort:skip
+from .patterns import parse_date, alpha, slug, nonemptystr  # noqa  isort:skip
 
 
 class BaseRouter(ABC):
