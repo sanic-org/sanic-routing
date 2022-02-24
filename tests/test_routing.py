@@ -2,6 +2,7 @@ import uuid
 from datetime import date
 
 import pytest
+
 from sanic_routing import BaseRouter
 from sanic_routing.exceptions import NoMethod, NotFound, RouteExists
 
