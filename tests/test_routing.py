@@ -474,7 +474,6 @@ def test_identical_path_routes_with_different_methods_complex(uri):
         "/api/<version:int>/hello_world/<foo:path>", handler2, methods=["GET"]
     )
     router.finalize()
-    print(router.find_route_src)
 
     _, handler, params = router.get(f"/{uri}", "OPTIONS")
     assert handler() == "handler1"

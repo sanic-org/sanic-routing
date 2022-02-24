@@ -73,7 +73,6 @@ class ParamInfo:
         params: t.Dict[str, t.Any],
         value: t.Union[str, t.Tuple[str, ...]],
     ) -> None:
-        print("processing", self.name, value)
         params[self.name] = value
 
 
