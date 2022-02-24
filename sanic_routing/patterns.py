@@ -31,6 +31,12 @@ def ext(param: str) -> Tuple[str, ...]:
     return parts
 
 
+def nonemptystr(param: str) -> str:
+    if not param:
+        raise ValueError(f"Value {param} is an empty string")
+    return param
+
+
 class ParamInfo:
     __slots__ = (
         "cast",
@@ -67,7 +73,8 @@ class ParamInfo:
         params: t.Dict[str, t.Any],
         value: t.Union[str, t.Tuple[str, ...]],
     ) -> None:
-        ...
+        print("processing", self.name, value)
+        params[self.name] = value
 
 
 class ExtParamInfo(ParamInfo):
@@ -145,7 +152,8 @@ REGEX_TYPES_ANNOTATION = Dict[
     str, Tuple[Callable[[str], Any], Pattern, Type[ParamInfo]]
 ]
 REGEX_TYPES: REGEX_TYPES_ANNOTATION = {
-    "str": (str, re.compile(r"^[^/]+$"), ParamInfo),
+    "strorempty": (str, re.compile(r"^[^/]*$"), ParamInfo),
+    "str": (nonemptystr, re.compile(r"^[^/]+$"), ParamInfo),
     "ext": (ext, re.compile(r"^[^/]+\." + EXTENSION + r"$"), ExtParamInfo),
     "slug": (slug, re.compile(r"^[a-z0-9]+(?:-[a-z0-9]+)*$"), ParamInfo),
     "alpha": (alpha, re.compile(r"^[A-Za-z]+$"), ParamInfo),

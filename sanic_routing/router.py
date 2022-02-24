@@ -2,7 +2,6 @@ import ast
 import sys
 import typing as t
 from abc import ABC, abstractmethod
-from re import Pattern
 from types import SimpleNamespace
 from warnings import warn
 
@@ -25,6 +24,10 @@ from .utils import parts_to_path, path_to_parts
 # The below functions might be called by the compiled source code, and
 # therefore should be made available here by import
 import re  # noqa  isort:skip
+from datetime import datetime  # noqa  isort:skip
+from urllib.parse import unquote  # noqa  isort:skip
+from uuid import UUID  # noqa  isort:skip
+from .patterns import parse_date, alpha, slug, nonemptystr  # noqa  isort:skip
 
 
 class BaseRouter(ABC):
@@ -105,10 +108,8 @@ class BaseRouter(ABC):
                     allowed_methods=route.methods,
                 )
 
-        # Regex routes evaluate and can extract params directly. They are set
-        # on param_basket["__params__"]
+        # Convert matched values to parameters
         params = param_basket["__params__"]
-
         if not params or param_basket["__matches__"]:
             # If param_basket["__params__"] does not exist, we might have
             # param_basket["__matches__"], which are indexed based matches
@@ -124,7 +125,9 @@ class BaseRouter(ABC):
                 # Apply if tuple (from ext) or if it is not a regex matcher
                 if isinstance(value, tuple):
                     param.process(params, value)
-                elif not route.regex:
+                elif (
+                    route.regex and param.cast is not str
+                ) or not route.regex:
                     params[param.name] = value
 
         # Double check that if we made a match it is not a false positive
@@ -252,11 +255,11 @@ class BaseRouter(ABC):
         self,
         label: str,
         cast: t.Callable[[str], t.Any],
-        pattern: t.Union[str, Pattern],
+        pattern: t.Union[t.Pattern, str],
         param_info_class: t.Type[ParamInfo] = ParamInfo,
     ):
         """
-        Add a custom parameter type to the router. The cast shoud raise a
+        Add a custom parameter type to the router. The cast should raise a
         ValueError if it is an incorrect type. The order of registration is
         important if it is possible that a single value could pass multiple
         pattern types. Therefore, patterns are tried in the REVERSE order of
@@ -271,7 +274,7 @@ class BaseRouter(ABC):
         :type cast: t.Callable[[str], t.Any]
         :param pattern: A regular expression that could also match the path
             segment
-        :type pattern: Pattern
+        :type pattern: Union[t.Pattern, str]
         """
         if not isinstance(label, str):
             raise InvalidUsage(
@@ -283,13 +286,15 @@ class BaseRouter(ABC):
                 "When registering a pattern, cast must be a "
                 f"callable, not cast={cast}"
             )
-        if isinstance(pattern, str):
-            pattern = re.compile(pattern)
-        if not isinstance(pattern, Pattern):
+        if not isinstance(pattern, str) and not isinstance(pattern, t.Pattern):
             raise InvalidUsage(
                 "When registering a pattern, pattern must be a "
-                f"string, not pattern={type(pattern)}"
+                f"string or a Pattern, not pattern={pattern}, "
+                f"type={type(pattern)}"
             )
+
+        if isinstance(pattern, str):
+            pattern = re.compile(pattern)
 
         globals()[cast.__name__] = cast
         self.regex_types[label] = (cast, pattern, param_info_class)
