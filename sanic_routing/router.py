@@ -241,7 +241,7 @@ class BaseRouter(ABC):
         self,
         label: str,
         cast: t.Callable[[str], t.Any],
-        pattern: t.Union[t.Pattern, str]
+        pattern: t.Union[t.Pattern, str],
     ):
         """
         Add a custom parameter type to the router. The cast should raise a
@@ -277,6 +277,9 @@ class BaseRouter(ABC):
                 f"string or a Pattern, not pattern={pattern}, "
                 f"type={type(pattern)}"
             )
+
+        if isinstance(pattern, str):
+            pattern = re.compile(pattern)
 
         globals()[cast.__name__] = cast
         self.regex_types[label] = (cast, pattern)
