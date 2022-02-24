@@ -125,9 +125,9 @@ class BaseRouter(ABC):
                 # Apply if tuple (from ext) or if it is not a regex matcher
                 if isinstance(value, tuple):
                     param.process(params, value)
-                elif (
+                elif not route.regex or (
                     route.regex and param.cast is not str
-                ) or not route.regex:
+                ):
                     params[param.name] = value
 
         # Double check that if we made a match it is not a false positive
