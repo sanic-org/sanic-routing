@@ -1,16 +1,11 @@
 import re
 import typing as t
-from collections import namedtuple
 from types import SimpleNamespace
 from warnings import warn
 
 from .exceptions import InvalidUsage, ParameterNameConflicts
+from .patterns import ParamInfo
 from .utils import Immutable, parts_to_path, path_to_parts
-
-ParamInfo = namedtuple(
-    "ParamInfo",
-    ("name", "raw_path", "label", "cast", "pattern", "regex", "priority"),
-)
 
 
 class Requirements(Immutable):
@@ -169,9 +164,17 @@ class Route:
                         label,
                         _type,
                         pattern,
+                        param_info_class,
                     ) = self.parse_parameter_string(part[1:-1])
+
                     self.add_parameter(
-                        idx, name, key_path, label, _type, pattern
+                        idx,
+                        name,
+                        key_path,
+                        label,
+                        _type,
+                        pattern,
+                        param_info_class,
                     )
 
     def add_parameter(
@@ -182,6 +185,7 @@ class Route:
         label: str,
         cast: t.Type,
         pattern=None,
+        param_info_class=ParamInfo,
     ):
         if pattern and isinstance(pattern, str):
             if not pattern.startswith("^"):
@@ -197,8 +201,14 @@ class Route:
             if is_regex
             else list(self.router.regex_types.keys()).index(label)
         )
-        self._params[idx] = ParamInfo(
-            name, raw_path, label, cast, pattern, is_regex, priority
+        self._params[idx] = param_info_class(
+            name=name,
+            raw_path=raw_path,
+            label=label,
+            cast=cast,
+            pattern=pattern,
+            regex=is_regex,
+            priority=priority,
         )
 
     def _finalize_params(self):
@@ -210,16 +220,25 @@ class Route:
                 f"Duplicate named parameters in: {self._raw_path}"
             )
         self.labels = labels
+
         self.params = dict(
             sorted(params.items(), key=lambda param: self._sorting(param[1]))
         )
+
+        if not self.regex and any(
+            ":" in param.label for param in self.params.values()
+        ):
+            raise InvalidUsage(
+                f"Invalid parameter declaration: {self.raw_path}"
+            )
 
     def _compile_regex(self):
         components = []
 
         for part in self.parts:
             if part.startswith("<"):
-                name, *_, pattern = self.parse_parameter_string(part)
+                name, *_, pattern, __ = self.parse_parameter_string(part)
+
                 if not isinstance(pattern, str):
                     pattern = pattern.pattern.strip("^$")
                 compiled = re.compile(pattern)
@@ -316,8 +335,14 @@ class Route:
         parameter_string = parameter_string.strip("<>")
         name = parameter_string
         label = "str"
+
         if ":" in parameter_string:
             name, label = parameter_string.split(":", 1)
+            if "=" in label:
+                label, _ = label.split("=", 1)
+            if "=" in name:
+                name, _ = name.split("=", 1)
+
             if not name:
                 raise ValueError(
                     f"Invalid parameter syntax: {parameter_string}"
@@ -337,7 +362,9 @@ class Route:
                     DeprecationWarning,
                 )
 
-        default = (str, label)
+        default = (str, label, ParamInfo)
+
         # Pull from pre-configured types
-        _type, pattern = self.router.regex_types.get(label, default)
-        return name, label, _type, pattern
+        found = self.router.regex_types.get(label, default)
+        _type, pattern, param_info_class = found
+        return name, label, _type, pattern, param_info_class

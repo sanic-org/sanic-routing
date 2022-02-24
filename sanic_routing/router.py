@@ -6,6 +6,7 @@ from types import SimpleNamespace
 from warnings import warn
 
 from sanic_routing.group import RouteGroup
+from sanic_routing.patterns import ParamInfo
 
 from .exceptions import (
     BadMethod,
@@ -15,7 +16,7 @@ from .exceptions import (
     NotFound,
 )
 from .line import Line
-from .patterns import REGEX_TYPES
+from .patterns import REGEX_TYPES, REGEX_TYPES_ANNOTATION
 from .route import Route
 from .tree import Node, Tree
 from .utils import parts_to_path, path_to_parts
@@ -60,7 +61,10 @@ class BaseRouter(ABC):
         self.ctx = SimpleNamespace()
         self.cascade_not_found = cascade_not_found
 
-        self.regex_types = {**REGEX_TYPES}
+        self.regex_types: REGEX_TYPES_ANNOTATION = {}
+
+        for label, (cast, pattern, param_info_class) in REGEX_TYPES.items():
+            self.register_pattern(label, cast, pattern, param_info_class)
 
     @abstractmethod
     def get(self, **kwargs):
@@ -106,21 +110,25 @@ class BaseRouter(ABC):
 
         # Convert matched values to parameters
         params = param_basket["__params__"]
-        if route.regex:
-            params.update(
-                {
-                    param.name: param.cast(
-                        param_basket["__params__"][param.name]
-                    )
-                    for param in route.params.values()
-                    if param.cast is not str
-                }
-            )
-        elif param_basket["__matches__"]:
-            params = {
-                param.name: param_basket["__matches__"][idx]
-                for idx, param in route.params.items()
-            }
+        if not params or param_basket["__matches__"]:
+            # If param_basket["__params__"] does not exist, we might have
+            # param_basket["__matches__"], which are indexed based matches
+            # on path segments. They should already be cast types.
+            for idx, param in route.params.items():
+                # If the param index does not exist, then rely upon
+                # the __params__
+                try:
+                    value = param_basket["__matches__"][idx]
+                except KeyError:
+                    continue
+
+                # Apply if tuple (from ext) or if it is not a regex matcher
+                if isinstance(value, tuple):
+                    param.process(params, value)
+                elif not route.regex or (
+                    route.regex and param.cast is not str
+                ):
+                    params[param.name] = value
 
         # Double check that if we made a match it is not a false positive
         # because of strict_slashes
@@ -248,6 +256,7 @@ class BaseRouter(ABC):
         label: str,
         cast: t.Callable[[str], t.Any],
         pattern: t.Union[t.Pattern, str],
+        param_info_class: t.Type[ParamInfo] = ParamInfo,
     ):
         """
         Add a custom parameter type to the router. The cast should raise a
@@ -288,7 +297,7 @@ class BaseRouter(ABC):
             pattern = re.compile(pattern)
 
         globals()[cast.__name__] = cast
-        self.regex_types[label] = (cast, pattern)
+        self.regex_types[label] = (cast, pattern, param_info_class)
 
     def finalize(self, do_compile: bool = True, do_optimize: bool = False):
         """
@@ -605,7 +614,7 @@ class BaseRouter(ABC):
             if not part.startswith("<") or ":" not in part:
                 return False
 
-            _, pattern_type = part[1:-1].split(":", 1)
+            _, pattern_type, *__ = part[1:-1].split(":")
 
             return (
                 part.endswith(":path>")

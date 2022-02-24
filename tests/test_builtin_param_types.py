@@ -2,7 +2,7 @@ from unittest.mock import Mock
 
 import pytest
 from sanic_routing import BaseRouter
-from sanic_routing.exceptions import NotFound
+from sanic_routing.exceptions import InvalidUsage, NotFound
 
 
 @pytest.fixture
@@ -135,6 +135,89 @@ def test_correct_slug_v_string(handler):
 
 
 @pytest.mark.parametrize(
+    "value", ("somefile.txt", "SomeFile.mp3", "some.thing", "with.extra.dot")
+)
+def test_ext_not_defined_matches(value):
+    def handler(**kwargs):
+        return kwargs
+
+    router = Router()
+
+    router.add("/<filename:ext>", handler)
+    router.finalize()
+
+    _, handler, params = router.get(f"/{value}", "BASE")
+    retval = handler(**params)
+
+    filename, ext = value.rsplit(".", 1)
+    assert retval["filename"] == filename
+    assert retval["ext"] == ext
+
+
+@pytest.mark.parametrize("value", ("somefile.mp3", "with.extra.mp3"))
+def test_ext_single_defined_matches(value):
+    def handler(**kwargs):
+        return kwargs
+
+    router = Router()
+
+    router.add("/<filename:ext=mp3>", handler)
+    router.finalize()
+
+    _, handler, params = router.get(f"/{value}", "BASE")
+    retval = handler(**params)
+
+    filename, ext = value.rsplit(".", 1)
+    assert retval["filename"] == filename
+    assert retval["ext"] == ext
+
+
+@pytest.mark.parametrize(
+    "value",
+    ("somefile.png", "with.extra.png", "somefile.jpg", "with.extra.jpg"),
+)
+def test_ext_multiple_defined_matches(value):
+    def handler(**kwargs):
+        return kwargs
+
+    router = Router()
+
+    router.add("/<filename:ext=jpg|png|gif>", handler)
+    router.finalize()
+
+    _, handler, params = router.get(f"/{value}", "BASE")
+    retval = handler(**params)
+
+    filename, ext = value.rsplit(".", 1)
+    assert retval["filename"] == filename
+    assert retval["ext"] == ext
+
+
+@pytest.mark.parametrize(
+    "path",
+    (
+        "/<filename=int:ext>",
+        "/<filename=int:ext=txt>",
+        "/<filename=int:ext=txt|csv>",
+    ),
+)
+def test_ext_multiple_defined_filename_types(path):
+    def handler(**kwargs):
+        return kwargs
+
+    router = Router()
+
+    router.add(path, handler)
+    router.finalize()
+
+    _, handler, params = router.get("/123.txt", "BASE")
+    retval = handler(**params)
+
+    assert retval["filename"] == 123
+    assert retval["ext"] == "txt"
+
+
+@pytest.mark.parametrize(
     "value,matches",
     (
         ("foo", True),
@@ -163,6 +246,75 @@ def test_nonempty_string(handler, value, matches):
 
     for path in ("/<foo>", "/<foo:str>"):
         test(path)
+
+
+@pytest.mark.parametrize(
+    "value",
+    ("somefile", "SomeFile."),
+)
+def test_ext_not_defined_no_matches(handler, value):
+    def handler(**kwargs):
+        return kwargs
+
+    router = Router()
+
+    router.add("/<filename:ext>", handler)
+    router.finalize()
+
+    with pytest.raises(NotFound):
+        router.get(f"/{value}", "BASE")
+
+
+@pytest.mark.parametrize(
+    "value",
+    ("somefile", "SomeFile.", "somefile.jpg"),
+)
+def test_ext_single_defined_no_matches(handler, value):
+    def handler(**kwargs):
+        return kwargs
+
+    router = Router()
+
+    router.add("/<filename:ext=txt>", handler)
+    router.finalize()
+
+    with pytest.raises(NotFound):
+        router.get(f"/{value}", "BASE")
+
+
+@pytest.mark.parametrize(
+    "value",
+    ("somefile", "SomeFile.", "somefile.txt"),
+)
+def test_ext_multiple_defined_no_matches(handler, value):
+    def handler(**kwargs):
+        return kwargs
+
+    router = Router()
+
+    router.add("/<filename:ext=jpg|png|gif>", handler)
+    router.finalize()
+
+    with pytest.raises(NotFound):
+        router.get(f"/{value}", "BASE")
+
+
+@pytest.mark.parametrize(
+    "definition",
+    (
+        "<filename:ext=and:more>",
+        "<filename:ext=and=more>",
+        "<filename:int:ext",
+        "<filename=int|alpha:ext>",
+        "<filename=int=alpha:ext",
+        "<filename:ext=bad#>",
+    ),
+)
+def test_bad_ext_definition(handler, definition):
+    router = Router()
+
+    with pytest.raises(InvalidUsage):
+        router.add(f"/{definition}", handler)
 
 
 @pytest.mark.parametrize(
@@ -232,3 +384,11 @@ def test_empty_hierarchy():
     assert params == expected
     handler1.assert_not_called()
     handler2.assert_called_once_with(**expected)
+
+
+def test_invalid_def(handler):
+    router = Router()
+    router.add("/one/<foo>/<bar:str:int>", handler)
+
+    with pytest.raises(InvalidUsage):
+        router.finalize()
