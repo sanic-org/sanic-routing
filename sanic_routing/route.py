@@ -220,9 +220,17 @@ class Route:
                 f"Duplicate named parameters in: {self._raw_path}"
             )
         self.labels = labels
+
         self.params = dict(
             sorted(params.items(), key=lambda param: self._sorting(param[1]))
         )
+
+        if not self.regex and any(
+            ":" in param.label for param in self.params.values()
+        ):
+            raise InvalidUsage(
+                f"Invalid parameter declaration: {self.raw_path}"
+            )
 
     def _compile_regex(self):
         components = []

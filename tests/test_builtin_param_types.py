@@ -1,7 +1,6 @@
 from unittest.mock import Mock
 
 import pytest
-
 from sanic_routing import BaseRouter
 from sanic_routing.exceptions import InvalidUsage, NotFound
 
@@ -385,3 +384,11 @@ def test_empty_hierarchy():
     assert params == expected
     handler1.assert_not_called()
     handler2.assert_called_once_with(**expected)
+
+
+def test_invalid_def(handler):
+    router = Router()
+    router.add("/one/<foo>/<bar:str:int>", handler)
+
+    with pytest.raises(InvalidUsage):
+        router.finalize()
