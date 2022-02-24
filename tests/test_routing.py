@@ -2,7 +2,6 @@ import uuid
 from datetime import date
 
 import pytest
-
 from sanic_routing import BaseRouter
 from sanic_routing.exceptions import NoMethod, NotFound, RouteExists
 
@@ -479,7 +478,7 @@ def test_identical_path_routes_with_different_methods_complex(uri):
 
     _, handler, params = router.get(f"/api/3/hello_world/{uri}", "GET")
     assert handler() == "handler2"
-    assert params == {"version": "3", "foo": uri}
+    assert params == {"version": 3, "foo": uri}
 
 
 @pytest.mark.parametrize("uri", ("a-random-path", "a/random/path"))

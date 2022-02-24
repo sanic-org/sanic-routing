@@ -104,13 +104,19 @@ class BaseRouter(ABC):
                     allowed_methods=route.methods,
                 )
 
-        # Regex routes evaluate and can extract params directly. They are set
-        # on param_basket["__params__"]
+        # Convert matched values to parameters
         params = param_basket["__params__"]
-        if not params:
-            # If param_basket["__params__"] does not exist, we might have
-            # param_basket["__matches__"], which are indexed based matches
-            # on path segments. They should already be cast types.
+        if route.regex:
+            params.update(
+                {
+                    param.name: param.cast(
+                        param_basket["__params__"][param.name]
+                    )
+                    for param in route.params.values()
+                    if param.cast is not str
+                }
+            )
+        elif param_basket["__matches__"]:
             params = {
                 param.name: param_basket["__matches__"][idx]
                 for idx, param in route.params.items()
