@@ -238,10 +238,13 @@ class BaseRouter(ABC):
         return route
 
     def register_pattern(
-        self, label: str, cast: t.Callable[[str], t.Any], pattern: str
+        self,
+        label: str,
+        cast: t.Callable[[str], t.Any],
+        pattern: t.Union[t.Pattern, str]
     ):
         """
-        Add a custom parameter type to the router. The cast shoud raise a
+        Add a custom parameter type to the router. The cast should raise a
         ValueError if it is an incorrect type. The order of registration is
         important if it is possible that a single value could pass multiple
         pattern types. Therefore, patterns are tried in the REVERSE order of
@@ -256,7 +259,7 @@ class BaseRouter(ABC):
         :type cast: t.Callable[[str], t.Any]
         :param pattern: A regular expression that could also match the path
             segment
-        :type pattern: str
+        :type pattern: Union[t.Pattern, str]
         """
         if not isinstance(label, str):
             raise InvalidUsage(
@@ -268,10 +271,11 @@ class BaseRouter(ABC):
                 "When registering a pattern, cast must be a "
                 f"callable, not cast={cast}"
             )
-        if not isinstance(pattern, str):
+        if not isinstance(pattern, str) and not isinstance(pattern, t.Pattern):
             raise InvalidUsage(
                 "When registering a pattern, pattern must be a "
-                f"string, not pattern={pattern}"
+                f"string or a Pattern, not pattern={pattern}, "
+                f"type={type(pattern)}"
             )
 
         globals()[cast.__name__] = cast

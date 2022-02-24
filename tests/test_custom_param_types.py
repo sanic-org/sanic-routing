@@ -54,6 +54,22 @@ def test_does_not_cast(handler):
         router.get("/notfound", "BASE")
 
 
+def test_works_with_patterns(handler):
+    router = Router()
+    router.register_pattern(
+        "ipv4",
+        ipaddress.ip_address,
+        re.compile(r"^(?:(?:25[0-5]|2[0-4][0-9]|"
+                   r"[01]?[0-9][0-9]?)\.){3}(?:25[0-5]|"
+                   r"2[0-4][0-9]|[01]?[0-9][0-9]?)$"))
+
+    router.add("/<ip:ipv4>", handler)
+    router.finalize()
+
+    with pytest.raises(NotFound):
+        router.get("/notfound", "BASE")
+
+
 def test_bad_registries():
     router = Router()
 
@@ -65,6 +81,3 @@ def test_bad_registries():
 
     with pytest.raises(InvalidUsage):
         router.register_pattern("ipv4", ipaddress.ip_address, None)
-
-    with pytest.raises(InvalidUsage):
-        router.register_pattern("regex", ipaddress.ip_address, re.compile(".*"))
