@@ -38,7 +38,7 @@ setup_kwargs = {
     "packages": ["sanic_routing"],
     "platforms": "any",
     "classifiers": [
-        "Development Status :: 3 - Alpha",
+        "Development Status :: 4 - Beta",
         "Environment :: Web Environment",
         "License :: OSI Approved :: MIT License",
         "Programming Language :: Python :: 3.7",
