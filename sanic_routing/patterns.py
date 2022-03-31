@@ -79,7 +79,7 @@ class ParamInfo:
 class ExtParamInfo(ParamInfo):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
-        match = REGEX_PARAM_NAME_EXT.match(self.raw_path)
+        match = REGEX_PARAM_EXT_PATH.search(self.raw_path)
         if not match:
             raise InvalidUsage(
                 f"Invalid extension parameter definition: {self.raw_path}"
@@ -133,10 +133,12 @@ class ExtParamInfo(ParamInfo):
 
 
 EXTENSION = r"[a-z0-9](?:[a-z0-9\.]*[a-z0-9])?"
-REGEX_PARAM_NAME = re.compile(r"^<([a-zA-Z_][a-zA-Z0-9_]*)(?::(.*))?>$")
-REGEX_PARAM_NAME_EXT = re.compile(
-    r"^<([a-zA-Z_][a-zA-Z0-9_]*)(?:=([a-z]+))?(?::ext(?:=([a-z0-9|\.]+))?)>$"
+PARAM_EXT = (
+    r"<([a-zA-Z_][a-zA-Z0-9_]*)(?:=([a-z]+))?(?::ext(?:=([a-z0-9|\.]+))?)>"
 )
+REGEX_PARAM_NAME = re.compile(r"^<([a-zA-Z_][a-zA-Z0-9_]*)(?::(.*))?>$")
+REGEX_PARAM_EXT_PATH = re.compile(PARAM_EXT)
+REGEX_PARAM_NAME_EXT = re.compile(r"^" + PARAM_EXT + r"$")
 REGEX_ALLOWED_EXTENSION = re.compile(r"^" + EXTENSION + r"$")
 
 # Predefined path parameter types. The value is a tuple consisteing of a
