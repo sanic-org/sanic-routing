@@ -18,6 +18,7 @@ class Route:
         "_params",
         "_raw_path",
         "ctx",
+        "extra",
         "handler",
         "labels",
         "methods",
@@ -37,6 +38,8 @@ class Route:
 
     #: A container for route meta-data
     ctx: SimpleNamespace
+    #: A container for route application-data
+    extra: SimpleNamespace
     #: The route handler
     handler: t.Callable[..., t.Any]
     #: The HTTP methods that the route can handle
@@ -85,6 +88,7 @@ class Route:
         self.requirements = Requirements(requirements or {})
 
         self.ctx = SimpleNamespace()
+        self.extra = SimpleNamespace()
 
         self._params: t.Dict[int, ParamInfo] = {}
         self._raw_path = raw_path
