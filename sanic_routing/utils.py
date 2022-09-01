@@ -18,7 +18,9 @@ class Immutable(Dict[str, str]):
         raise TypeError("Cannot change immutable dict")
 
 
-def parse_parameter_basket(route: "Route", basket: Dict[int, Any], raw_path=None):
+def parse_parameter_basket(
+    route: "Route", basket: Dict[int, Any], raw_path=None
+):
     params = {}
     if basket:
         for idx, value in basket.items():
@@ -89,7 +91,8 @@ def parts_to_path(parts: Tuple[str, ...], delimiter: str = "/"):
                     if match.group(3):
                         extension_type = f"={match.group(3)}"
                     segment = (
-                        f"<{match.group(1)}{filename_type}:" f"ext{extension_type}>"
+                        f"<{match.group(1)}{filename_type}:"
+                        f"ext{extension_type}>"
                     )
                     path.append(segment)
                 else:
