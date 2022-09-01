@@ -56,7 +56,7 @@ class RouteGroup:
     #:  include a preceding '/', this adds it back.
     uri: str
 
-    def __init__(self, *routes) -> None:
+    def __init__(self, *routes: Route) -> None:
         if len(set(route.parts for route in routes)) > 1:
             raise InvalidUsage("Cannot group routes with differing paths")
 
@@ -70,9 +70,7 @@ class RouteGroup:
         self.pattern_idx = 0
 
     def __str__(self):
-        display = (
-            f"path={self.path or self.router.delimiter} len={len(self.routes)}"
-        )
+        display = f"path={self.path or self.router.delimiter} len={len(self.routes)}"
         return f"<{self.__class__.__name__}: {display}>"
 
     def __repr__(self) -> str:
@@ -81,10 +79,10 @@ class RouteGroup:
     def __iter__(self):
         return iter(self.routes)
 
-    def __getitem__(self, key):
+    def __getitem__(self, key: int):
         return self.routes[key]
 
-    def __getattr__(self, key):
+    def __getattr__(self, key: str):
         # There are a number of properties that all of the routes in the group
         # share in common. We pass thrm through to make them available
         # on the RouteGroup, and then cache them so that they are permanent.
@@ -97,11 +95,7 @@ class RouteGroup:
 
     def finalize(self):
         self.methods_index = Immutable(
-            {
-                method: route
-                for route in self._routes
-                for method in route.methods
-            }
+            {method: route for route in self._routes for method in route.methods}
         )
 
     def reset(self):
@@ -147,14 +141,8 @@ class RouteGroup:
             for current_route in self:
                 if (
                     current_route == other_route
-                    or (
-                        current_route.requirements
-                        and not other_route.requirements
-                    )
-                    or (
-                        not current_route.requirements
-                        and other_route.requirements
-                    )
+                    or (current_route.requirements and not other_route.requirements)
+                    or (not current_route.requirements and other_route.requirements)
                 ) and not append:
                     if not overwrite:
                         raise RouteExists(
@@ -182,9 +170,7 @@ class RouteGroup:
     @property
     def methods(self) -> FrozenSet[str]:
         """"""
-        return frozenset(
-            [method for route in self for method in route.methods]
-        )
+        return frozenset([method for route in self for method in route.methods])
 
     @property
     def routes(self) -> Sequence[Route]:

@@ -1,4 +1,4 @@
-from typing import Optional, Set
+from typing import FrozenSet, Optional, Set, Union
 
 
 class BaseException(Exception):
@@ -24,7 +24,7 @@ class NoMethod(BaseException):
         self,
         message: str = "Method does not exist",
         method: Optional[str] = None,
-        allowed_methods: Optional[Set[str]] = None,
+        allowed_methods: Optional[Union[Set[str], FrozenSet[str]]] = None,
     ):
         super().__init__(message)
         self.method = method

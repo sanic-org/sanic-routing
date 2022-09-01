@@ -1,20 +1,24 @@
 import re
+from typing import TYPE_CHECKING, Any, Dict, List, NoReturn, Tuple
 from urllib.parse import quote, unquote
 
 from sanic_routing.exceptions import InvalidUsage
 
 from .patterns import REGEX_PARAM_NAME, REGEX_PARAM_NAME_EXT
 
+if TYPE_CHECKING:
+    from .route import Route
 
-class Immutable(dict):
-    def __setitem__(self, *args):
+
+class Immutable(Dict[str, str]):
+    def __setitem__(self, *args: Any) -> NoReturn:
         raise TypeError("Cannot change immutable dict")
 
-    def __delitem__(self, *args):
+    def __delitem__(self, *args: Any) -> NoReturn:
         raise TypeError("Cannot change immutable dict")
 
 
-def parse_parameter_basket(route, basket, raw_path=None):
+def parse_parameter_basket(route: "Route", basket: Dict[int, Any], raw_path=None):
     params = {}
     if basket:
         for idx, value in basket.items():

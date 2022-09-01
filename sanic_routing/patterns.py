@@ -8,7 +8,7 @@ from typing import Any, Callable, Dict, Pattern, Tuple, Type
 from sanic_routing.exceptions import InvalidUsage, NotFound
 
 
-def parse_date(d) -> date:
+def parse_date(d: str) -> date:
     return datetime.strptime(d, "%Y-%m-%d").date()
 
 
@@ -55,7 +55,7 @@ class ParamInfo:
         raw_path: str,
         label: str,
         cast: t.Callable[[str], t.Any],
-        pattern: re.Pattern,
+        pattern: re.Pattern[Any],
         regex: bool,
         priority: int,
     ) -> None:
@@ -77,7 +77,7 @@ class ParamInfo:
 
 
 class ExtParamInfo(ParamInfo):
-    def __init__(self, **kwargs):
+    def __init__(self, **kwargs: Any):
         super().__init__(**kwargs)
         match = REGEX_PARAM_EXT_PATH.search(self.raw_path)
         if not match:
@@ -86,8 +86,7 @@ class ExtParamInfo(ParamInfo):
             )
         if match.group(2) == "path":
             raise InvalidUsage(
-                "Extension parameter matching does not support the "
-                "`path` type."
+                "Extension parameter matching does not support the " "`path` type."
             )
         ext_type = match.group(3)
         regex_type = REGEX_TYPES.get(match.group(2))
@@ -117,7 +116,11 @@ class ExtParamInfo(ParamInfo):
                 if not REGEX_ALLOWED_EXTENSION.match(extension):
                     raise InvalidUsage(f"Invalid extension: {extension}")
 
-    def process(self, params, value):
+    def process(
+        self,
+        params: Dict[str, str],
+        value: t.Union[str, t.Tuple[str, ...]],
+    ) -> None:
         stop = -1 * (self.ctx.allowed_sub_count + 1)
         filename = ".".join(value[:stop])
         ext = ".".join(value[stop:])
@@ -133,9 +136,7 @@ class ExtParamInfo(ParamInfo):
 
 
 EXTENSION = r"[a-z0-9](?:[a-z0-9\.]*[a-z0-9])?"
-PARAM_EXT = (
-    r"<([a-zA-Z_][a-zA-Z0-9_]*)(?:=([a-z]+))?(?::ext(?:=([a-z0-9|\.]+))?)>"
-)
+PARAM_EXT = r"<([a-zA-Z_][a-zA-Z0-9_]*)(?:=([a-z]+))?(?::ext(?:=([a-z0-9|\.]+))?)>"
 REGEX_PARAM_NAME = re.compile(r"^<([a-zA-Z_][a-zA-Z0-9_]*)(?::(.*))?>$")
 REGEX_PARAM_EXT_PATH = re.compile(PARAM_EXT)
 REGEX_PARAM_NAME_EXT = re.compile(r"^" + PARAM_EXT + r"$")
@@ -150,7 +151,7 @@ REGEX_ALLOWED_EXTENSION = re.compile(r"^" + EXTENSION + r"$")
 # The regular expression is generally NOT used. Unless the path is forced
 # to use regex patterns.
 REGEX_TYPES_ANNOTATION = Dict[
-    str, Tuple[Callable[[str], Any], Pattern, Type[ParamInfo]]
+    str, Tuple[Callable[[str], Any], Pattern[Any], Type[ParamInfo]]
 ]
 REGEX_TYPES: REGEX_TYPES_ANNOTATION = {
     "strorempty": (str, re.compile(r"^[^/]*$"), ParamInfo),

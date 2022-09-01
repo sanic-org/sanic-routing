@@ -7,9 +7,12 @@ from .exceptions import InvalidUsage, ParameterNameConflicts
 from .patterns import ParamInfo
 from .utils import Immutable, parts_to_path, path_to_parts
 
+if t.TYPE_CHECKING:
+    from .router import BaseRouter
+
 
 class Requirements(Immutable):
-    def __hash__(self):
+    def __hash__(self) -> int:  # type:ignore
         return hash(frozenset(self.items()))
 
 
@@ -69,12 +72,12 @@ class Route:
 
     def __init__(
         self,
-        router,
+        router: "BaseRouter",
         raw_path: str,
         name: str,
         handler: t.Callable[..., t.Any],
         methods: t.Union[t.Sequence[str], t.FrozenSet[str]],
-        requirements: t.Dict[str, t.Any] = None,
+        requirements: t.Optional[t.Dict[str, t.Any]] = None,
         strict: bool = False,
         unquote: bool = False,
         static: bool = False,
@@ -123,7 +126,7 @@ class Route:
     def __repr__(self) -> str:
         return str(self)
 
-    def __eq__(self, other) -> bool:
+    def __eq__(self, other: t.Any) -> bool:
         if not isinstance(other, self.__class__):
             return False
 
@@ -145,8 +148,8 @@ class Route:
             and (self.methods & other.methods)
         )
 
-    def _ingest_path(self, path):
-        segments = []
+    def _ingest_path(self, path: str):
+        segments: t.List[str] = []
         for part in path.split(self.router.delimiter):
             if part.startswith("<") and ":" not in part:
                 name = part[1:-1]
@@ -187,9 +190,9 @@ class Route:
         name: str,
         raw_path: str,
         label: str,
-        cast: t.Type,
-        pattern=None,
-        param_info_class=ParamInfo,
+        cast: t.Type[t.Any],
+        pattern: t.Optional[t.Union[re.Pattern[t.Any], str]] = None,
+        param_info_class: t.Type[ParamInfo] = ParamInfo,
     ):
         if pattern and isinstance(pattern, str):
             if not pattern.startswith("^"):
@@ -200,17 +203,14 @@ class Route:
             pattern = re.compile(pattern)
 
         is_regex = label not in self.router.regex_types
-        priority = (
-            0
-            if is_regex
-            else list(self.router.regex_types.keys()).index(label)
-        )
+        priority = 0 if is_regex else list(self.router.regex_types.keys()).index(label)
+
         self._params[idx] = param_info_class(
             name=name,
             raw_path=raw_path,
             label=label,
             cast=cast,
-            pattern=pattern,
+            pattern=pattern,  # type: ignore
             regex=is_regex,
             priority=priority,
         )
@@ -229,15 +229,11 @@ class Route:
             sorted(params.items(), key=lambda param: self._sorting(param[1]))
         )
 
-        if not self.regex and any(
-            ":" in param.label for param in self.params.values()
-        ):
-            raise InvalidUsage(
-                f"Invalid parameter declaration: {self.raw_path}"
-            )
+        if not self.regex and any(":" in param.label for param in self.params.values()):
+            raise InvalidUsage(f"Invalid parameter declaration: {self.raw_path}")
 
     def _compile_regex(self):
-        components = []
+        components: t.List[str] = []
 
         for part in self.parts:
             if part.startswith("<"):
@@ -270,9 +266,7 @@ class Route:
             else:
                 components.append(part)
 
-        self.pattern = self.router.delimiter + self.router.delimiter.join(
-            components
-        )
+        self.pattern = self.router.delimiter + self.router.delimiter.join(components)
 
     def finalize(self):
         self._finalize_params()
@@ -284,11 +278,11 @@ class Route:
         self.requirements = dict(self.requirements)
 
     @property
-    def defined_params(self):
+    def defined_params(self) -> t.Dict[int, ParamInfo]:
         return self._params
 
     @property
-    def raw_path(self):
+    def raw_path(self) -> str:
         """
         The raw path from the route definition
         """
@@ -309,14 +303,14 @@ class Route:
         )
 
     @property
-    def uri(self):
+    def uri(self) -> str:
         """
         Since :py:attr:`~sanic_routing.route.Route.path` does NOT
         include a preceding '/', this adds it back.
         """
         return f"{self.router.delimiter}{self.path}"
 
-    def _sorting(self, item) -> int:
+    def _sorting(self, item: ParamInfo) -> int:
         try:
             return list(self.router.regex_types.keys()).index(item.label)
         except ValueError:
@@ -348,9 +342,7 @@ class Route:
                 name, _ = name.split("=", 1)
 
             if not name:
-                raise ValueError(
-                    f"Invalid parameter syntax: {parameter_string}"
-                )
+                raise ValueError(f"Invalid parameter syntax: {parameter_string}")
             if label == "string":
                 warn(
                     "Use of 'string' as a path parameter type is deprected, "

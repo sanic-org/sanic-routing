@@ -1,9 +1,13 @@
 import typing as t
 from logging import getLogger
 
+
 from .group import RouteGroup
 from .line import Line
-from .patterns import REGEX_PARAM_NAME, REGEX_PARAM_NAME_EXT
+from .patterns import REGEX_PARAM_NAME, REGEX_PARAM_NAME_EXT, ParamInfo
+
+if t.TYPE_CHECKING:
+    from sanic_routing.router import BaseRouter
 
 logger = getLogger("sanic.root")
 
@@ -13,9 +17,9 @@ class Node:
         self,
         part: str = "",
         root: bool = False,
-        parent=None,
-        router=None,
-        param=None,
+        parent: t.Optional["Node"] = None,
+        router: t.Optional["BaseRouter"] = None,
+        param: t.Optional[ParamInfo] = None,
     ) -> None:
         self.root = root
         self.part = part
@@ -50,11 +54,7 @@ class Node:
 
     @property
     def ident(self) -> str:
-        prefix = (
-            f"{self.parent.ident}."
-            if self.parent and not self.parent.root
-            else ""
-        )
+        prefix = f"{self.parent.ident}." if self.parent and not self.parent.root else ""
         return f"{prefix}{self.idx}"
 
     @property
@@ -142,6 +142,7 @@ class Node:
         # Since this could take place in a few different locations, we need
         # to be able to track if it has been set.
         if self.groups:
+            assert self.parent
             operation = "==" if self.level == self.parent.depth else ">="
             self.equality_check = operation == "=="
 
@@ -229,9 +230,7 @@ class Node:
                 # This is for any inline regex routes. It sould not include,
                 # path or path-like routes.
                 if group.regex:
-                    self._inject_regex(
-                        location, return_indent + group_bump, group
-                    )
+                    self._inject_regex(location, return_indent + group_bump, group)
                     group_bump += 1
 
                 # Since routes are grouped, we need to know which to select
@@ -253,10 +252,11 @@ class Node:
     def add_child(self, child: "Node") -> None:
         self._children[child.part] = child
 
-    def _inject_param_check(self, location, indent, idx):
+    def _inject_param_check(self, location: t.List[Line], indent: int, idx: int):
         """
         Try and cast relevant path segments.
         """
+        assert self.param
         lines = [
             Line("try:", indent),
             Line(
@@ -281,7 +281,7 @@ class Node:
         location.extend(lines)
 
     @staticmethod
-    def _inject_method_check(location, indent, group):
+    def _inject_method_check(location: t.List[Line], indent: int, group: RouteGroup):
         """
         Sometimes we need to check the routing methods inside the generated src
         """
@@ -303,7 +303,13 @@ class Node:
             ]
         )
 
-    def _inject_return(self, location, indent, route_idx, group):
+    def _inject_return(
+        self,
+        location: t.List[Line],
+        indent: int,
+        route_idx: t.Union[int, str],
+        group: RouteGroup,
+    ):
         """
         The return statement for the node if needed
         """
@@ -322,7 +328,9 @@ class Node:
             ]
         )
 
-    def _inject_requirements(self, location, indent, group):
+    def _inject_requirements(
+        self, location: t.List[Line], indent: int, group: RouteGroup
+    ):
         """
         Check any extra checks needed for a route. In path routing, for exampe,
         this is used for matching vhosts.
@@ -349,7 +357,7 @@ class Node:
             ]
         )
 
-    def _inject_regex(self, location, indent, group):
+    def _inject_regex(self, location: t.List[Line], indent: int, group: RouteGroup):
         """
         For any path matching that happens in the course of the tree (anything
         that has a path matching--<path:path>--or similar matching with regex
@@ -358,10 +366,7 @@ class Node:
         location.extend(
             [
                 Line(
-                    (
-                        "match = router.matchers"
-                        f"[{group.pattern_idx}].match(path)"
-                    ),
+                    ("match = router.matchers" f"[{group.pattern_idx}].match(path)"),
                     indent,
                 ),
                 Line("if match:", indent),
@@ -372,13 +377,17 @@ class Node:
             ]
         )
 
-    def _sorting(self, item) -> t.Tuple[bool, bool, int, int, int, bool, str]:
+    def _sorting(
+        self, item: t.Tuple[str, "Node"]
+    ) -> t.Tuple[bool, bool, int, int, int, bool, str]:
         """
         Primarily use to sort nodes to determine the order of the nested tree
         """
+
         key, child = item
         type_ = 0
         if child.dynamic:
+            assert child.param
             type_ = child.param.priority
 
         return (
@@ -387,44 +396,40 @@ class Node:
             type_ * -1,
             child.depth * -1,
             len(child._children),
-            not bool(
-                child.groups and any(group.regex for group in child.groups)
-            ),
+            not bool(child.groups and any(group.regex for group in child.groups)),
             key,
         )
 
-    def _group_sorting(self, item) -> t.Tuple[int, ...]:
+    def _group_sorting(self, item: RouteGroup) -> t.Tuple[int, ...]:
         """
         When multiple RouteGroups terminate on the same node, we want to
         evaluate them based upon the priority of the param matching types
         """
 
-        def get_type(segment):
+        def get_type(segment: str):
             type_ = 0
             if segment.startswith("<"):
                 key = segment[1:-1]
                 if ":" in key:
                     key, param_type = key.split(":", 1)
                     try:
-                        type_ = list(self.router.regex_types.keys()).index(
-                            param_type
-                        )
+                        type_ = list(self.router.regex_types.keys()).index(param_type)  # type: ignore
                     except ValueError:
-                        type_ = len(list(self.router.regex_types.keys()))
+                        type_ = len(list(self.router.regex_types.keys()))  # type: ignore
             return type_ * -1
 
         segments = tuple(map(get_type, item.parts))
         return segments
 
     @property
-    def depth(self):
+    def depth(self) -> int:
         if not self._children:
             return self.level
         return max(child.depth for child in self._children.values())
 
 
 class Tree:
-    def __init__(self, router) -> None:
+    def __init__(self, router: "BaseRouter") -> None:
         self.root = Node(root=True, router=router)
         self.root.level = 0
         self.router = router
