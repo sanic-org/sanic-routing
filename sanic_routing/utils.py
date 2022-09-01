@@ -52,7 +52,7 @@ def parse_parameter_basket(route: "Route", basket: Dict[int, Any], raw_path=None
     return params, raw_path
 
 
-def path_to_parts(path, delimiter="/"):
+def path_to_parts(path: str, delimiter: str = "/") -> tuple[str, ...]:
     r"""
     OK > /foo/<id:int>/bar/<name:[A-z]+>
     OK > /foo/<unhashable:[A-Za-z0-9/]+>
@@ -69,31 +69,30 @@ def path_to_parts(path, delimiter="/"):
     )
 
 
-def parts_to_path(parts, delimiter="/"):
-    path = []
+def parts_to_path(parts: Tuple[str, ...], delimiter: str = "/"):
+    path: List[str] = []
     for part in parts:
         if part.startswith("<"):
-            try:
-                match = REGEX_PARAM_NAME.match(part)
-                param_type = ""
+            match = REGEX_PARAM_NAME.match(part)
+            param_type = ""
+            if match:
                 if match.group(2):
                     param_type = f":{match.group(2)}"
                 path.append(f"<{match.group(1)}{param_type}>")
-            except AttributeError:
-                try:
-                    match = REGEX_PARAM_NAME_EXT.match(part)
-                    filename_type = ""
-                    extension_type = ""
+            else:
+                match = REGEX_PARAM_NAME_EXT.match(part)
+                filename_type = ""
+                extension_type = ""
+                if match:
                     if match.group(2):
                         filename_type = f"={match.group(2)}"
                     if match.group(3):
                         extension_type = f"={match.group(3)}"
                     segment = (
-                        f"<{match.group(1)}{filename_type}:"
-                        f"ext{extension_type}>"
+                        f"<{match.group(1)}{filename_type}:" f"ext{extension_type}>"
                     )
                     path.append(segment)
-                except AttributeError:
+                else:
                     raise InvalidUsage(f"Invalid declaration: {part}")
         else:
             path.append(part)
