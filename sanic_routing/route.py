@@ -74,7 +74,7 @@ class Route:
 
     def __init__(
         self,
-        router: "BaseRouter",
+        router: BaseRouter,
         raw_path: str,
         name: str,
         handler: t.Callable[..., t.Any],

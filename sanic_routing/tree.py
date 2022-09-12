@@ -1,3 +1,4 @@
+from __future__ import annotations
 import typing as t
 from logging import getLogger
 
@@ -17,7 +18,7 @@ class Node:
         part: str = "",
         root: bool = False,
         parent: t.Optional["Node"] = None,
-        router: t.Optional["BaseRouter"] = None,
+        router: t.Optional[BaseRouter] = None,
         param: t.Optional[ParamInfo] = None,
     ) -> None:
         self.root = root
