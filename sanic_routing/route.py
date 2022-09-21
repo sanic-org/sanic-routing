@@ -14,7 +14,7 @@ if t.TYPE_CHECKING:
 
 
 class Requirements(Immutable):
-    def __hash__(self) -> int:  # type:ignore
+    def __hash__(self):
         return hash(frozenset(self.items()))
 
 
@@ -205,14 +205,18 @@ class Route:
             pattern = re.compile(pattern)
 
         is_regex = label not in self.router.regex_types
-        priority = 0 if is_regex else list(self.router.regex_types.keys()).index(label)
+        priority = (
+            0
+            if is_regex
+            else list(self.router.regex_types.keys()).index(label)
+        )
 
         self._params[idx] = param_info_class(
             name=name,
             raw_path=raw_path,
             label=label,
             cast=cast,
-            pattern=pattern,
+            pattern=t.cast(t.Pattern[t.Any], pattern),
             regex=is_regex,
             priority=priority,
         )
@@ -231,8 +235,12 @@ class Route:
             sorted(params.items(), key=lambda param: self._sorting(param[1]))
         )
 
-        if not self.regex and any(":" in param.label for param in self.params.values()):
-            raise InvalidUsage(f"Invalid parameter declaration: {self.raw_path}")
+        if not self.regex and any(
+            ":" in param.label for param in self.params.values()
+        ):
+            raise InvalidUsage(
+                f"Invalid parameter declaration: {self.raw_path}"
+            )
 
     def _compile_regex(self):
         components: t.List[str] = []
@@ -268,7 +276,9 @@ class Route:
             else:
                 components.append(part)
 
-        self.pattern = self.router.delimiter + self.router.delimiter.join(components)
+        self.pattern = self.router.delimiter + self.router.delimiter.join(
+            components
+        )
 
     def finalize(self):
         self._finalize_params()
@@ -344,7 +354,9 @@ class Route:
                 name, _ = name.split("=", 1)
 
             if not name:
-                raise ValueError(f"Invalid parameter syntax: {parameter_string}")
+                raise ValueError(
+                    f"Invalid parameter syntax: {parameter_string}"
+                )
             if label == "string":
                 warn(
                     "Use of 'string' as a path parameter type is deprected, "

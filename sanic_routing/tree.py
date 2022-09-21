@@ -54,7 +54,11 @@ class Node:
 
     @property
     def ident(self) -> str:
-        prefix = f"{self.parent.ident}." if self.parent and not self.parent.root else ""
+        prefix = (
+            f"{self.parent.ident}."
+            if self.parent and not self.parent.root
+            else ""
+        )
         return f"{prefix}{self.idx}"
 
     @property
@@ -230,7 +234,9 @@ class Node:
                 # This is for any inline regex routes. It sould not include,
                 # path or path-like routes.
                 if group.regex:
-                    self._inject_regex(location, return_indent + group_bump, group)
+                    self._inject_regex(
+                        location, return_indent + group_bump, group
+                    )
                     group_bump += 1
 
                 # Since routes are grouped, we need to know which to select
@@ -252,7 +258,9 @@ class Node:
     def add_child(self, child: "Node") -> None:
         self._children[child.part] = child
 
-    def _inject_param_check(self, location: t.List[Line], indent: int, idx: int):
+    def _inject_param_check(
+        self, location: t.List[Line], indent: int, idx: int
+    ):
         """
         Try and cast relevant path segments.
         """
@@ -281,7 +289,9 @@ class Node:
         location.extend(lines)
 
     @staticmethod
-    def _inject_method_check(location: t.List[Line], indent: int, group: RouteGroup):
+    def _inject_method_check(
+        location: t.List[Line], indent: int, group: RouteGroup
+    ):
         """
         Sometimes we need to check the routing methods inside the generated src
         """
@@ -357,7 +367,9 @@ class Node:
             ]
         )
 
-    def _inject_regex(self, location: t.List[Line], indent: int, group: RouteGroup):
+    def _inject_regex(
+        self, location: t.List[Line], indent: int, group: RouteGroup
+    ):
         """
         For any path matching that happens in the course of the tree (anything
         that has a path matching--<path:path>--or similar matching with regex
@@ -366,7 +378,10 @@ class Node:
         location.extend(
             [
                 Line(
-                    ("match = router.matchers" f"[{group.pattern_idx}].match(path)"),
+                    (
+                        "match = router.matchers"
+                        f"[{group.pattern_idx}].match(path)"
+                    ),
                     indent,
                 ),
                 Line("if match:", indent),
@@ -396,7 +411,9 @@ class Node:
             type_ * -1,
             child.depth * -1,
             len(child._children),
-            not bool(child.groups and any(group.regex for group in child.groups)),
+            not bool(
+                child.groups and any(group.regex for group in child.groups)
+            ),
             key,
         )
 
