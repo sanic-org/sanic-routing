@@ -55,7 +55,7 @@ class ParamInfo:
         raw_path: str,
         label: str,
         cast: t.Callable[[str], t.Any],
-        pattern: re.Pattern[Any],
+        pattern: Pattern[Any],
         regex: bool,
         priority: int,
     ) -> None:
