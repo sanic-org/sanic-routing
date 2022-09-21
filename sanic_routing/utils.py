@@ -54,7 +54,7 @@ def parse_parameter_basket(
     return params, raw_path
 
 
-def path_to_parts(path: str, delimiter: str = "/") -> tuple[str, ...]:
+def path_to_parts(path: str, delimiter: str = "/") -> Tuple[str, ...]:
     r"""
     OK > /foo/<id:int>/bar/<name:[A-z]+>
     OK > /foo/<unhashable:[A-Za-z0-9/]+>
