@@ -56,7 +56,7 @@ class RouteGroup:
     #:  include a preceding '/', this adds it back.
     uri: str
 
-    def __init__(self, *routes) -> None:
+    def __init__(self, *routes: Route) -> None:
         if len(set(route.parts for route in routes)) > 1:
             raise InvalidUsage("Cannot group routes with differing paths")
 
@@ -81,10 +81,10 @@ class RouteGroup:
     def __iter__(self):
         return iter(self.routes)
 
-    def __getitem__(self, key):
+    def __getitem__(self, key: int):
         return self.routes[key]
 
-    def __getattr__(self, key):
+    def __getattr__(self, key: str):
         # There are a number of properties that all of the routes in the group
         # share in common. We pass thrm through to make them available
         # on the RouteGroup, and then cache them so that they are permanent.

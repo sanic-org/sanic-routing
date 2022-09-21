@@ -1,20 +1,26 @@
 import re
+from typing import TYPE_CHECKING, Any, Dict, List, NoReturn, Tuple
 from urllib.parse import quote, unquote
 
 from sanic_routing.exceptions import InvalidUsage
 
 from .patterns import REGEX_PARAM_NAME, REGEX_PARAM_NAME_EXT
 
+if TYPE_CHECKING:
+    from .route import Route
 
-class Immutable(dict):
-    def __setitem__(self, *args):
+
+class Immutable(Dict[Any, Any]):
+    def __setitem__(self, *args: Any) -> NoReturn:
         raise TypeError("Cannot change immutable dict")
 
-    def __delitem__(self, *args):
+    def __delitem__(self, *args: Any) -> NoReturn:
         raise TypeError("Cannot change immutable dict")
 
 
-def parse_parameter_basket(route, basket, raw_path=None):
+def parse_parameter_basket(
+    route: "Route", basket: Dict[int, Any], raw_path=None
+):
     params = {}
     if basket:
         for idx, value in basket.items():
@@ -48,7 +54,7 @@ def parse_parameter_basket(route, basket, raw_path=None):
     return params, raw_path
 
 
-def path_to_parts(path, delimiter="/"):
+def path_to_parts(path: str, delimiter: str = "/") -> Tuple[str, ...]:
     r"""
     OK > /foo/<id:int>/bar/<name:[A-z]+>
     OK > /foo/<unhashable:[A-Za-z0-9/]+>
@@ -65,21 +71,21 @@ def path_to_parts(path, delimiter="/"):
     )
 
 
-def parts_to_path(parts, delimiter="/"):
-    path = []
+def parts_to_path(parts: Tuple[str, ...], delimiter: str = "/"):
+    path: List[str] = []
     for part in parts:
         if part.startswith("<"):
-            try:
-                match = REGEX_PARAM_NAME.match(part)
-                param_type = ""
+            match = REGEX_PARAM_NAME.match(part)
+            param_type = ""
+            if match:
                 if match.group(2):
                     param_type = f":{match.group(2)}"
                 path.append(f"<{match.group(1)}{param_type}>")
-            except AttributeError:
-                try:
-                    match = REGEX_PARAM_NAME_EXT.match(part)
-                    filename_type = ""
-                    extension_type = ""
+            else:
+                match = REGEX_PARAM_NAME_EXT.match(part)
+                filename_type = ""
+                extension_type = ""
+                if match:
                     if match.group(2):
                         filename_type = f"={match.group(2)}"
                     if match.group(3):
@@ -89,7 +95,7 @@ def parts_to_path(parts, delimiter="/"):
                         f"ext{extension_type}>"
                     )
                     path.append(segment)
-                except AttributeError:
+                else:
                     raise InvalidUsage(f"Invalid declaration: {part}")
         else:
             path.append(part)

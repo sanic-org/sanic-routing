@@ -13,5 +13,5 @@ class Line:
         self.offset = offset
         self.render = render
 
-    def __str__(self):
+    def __str__(self) -> str:
         return (self.TAB * self.indent) + self.src + "\n"

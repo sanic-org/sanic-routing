@@ -67,7 +67,7 @@ class BaseRouter(ABC):
             self.register_pattern(label, cast, pattern, param_info_class)
 
     @abstractmethod
-    def get(self, **kwargs):
+    def get(self, **kwargs: t.Any):
         ...
 
     def resolve(
@@ -100,6 +100,7 @@ class BaseRouter(ABC):
 
         if isinstance(route, RouteGroup):
             try:
+                assert method
                 route = route.methods_index[method]
             except KeyError:
                 raise self.method_handler_exception(
@@ -147,7 +148,7 @@ class BaseRouter(ABC):
     def add(
         self,
         path: str,
-        handler: t.Callable,
+        handler: t.Callable[..., t.Any],
         methods: t.Optional[
             t.Union[t.Sequence[str], t.FrozenSet[str], str]
         ] = None,
@@ -255,7 +256,7 @@ class BaseRouter(ABC):
         self,
         label: str,
         cast: t.Callable[[str], t.Any],
-        pattern: t.Union[t.Pattern, str],
+        pattern: t.Union[t.Pattern[t.Any], str],
         param_info_class: t.Type[ParamInfo] = ParamInfo,
     ):
         """
@@ -387,7 +388,7 @@ class BaseRouter(ABC):
             Line("def find_route(path, method, router, basket, extra):", 0),
             Line("parts = tuple(path[1:].split(router.delimiter))", 1),
         ]
-        delayed = []
+        delayed: t.List[Line] = []
 
         # Add static path matching
         if self.static_routes:
@@ -524,15 +525,15 @@ class BaseRouter(ABC):
             self._matchers = ctx.get("matchers")
 
     @property
-    def find_route(self):
+    def find_route(self) -> t.Any:
         return self._find_route
 
     @property
-    def matchers(self):
+    def matchers(self) -> t.Optional[t.Any]:
         return self._matchers
 
     @property
-    def groups(self):
+    def groups(self) -> t.Dict[t.Tuple[str, ...], RouteGroup]:
         return {
             **self.static_routes,
             **self.dynamic_routes,
@@ -540,12 +541,12 @@ class BaseRouter(ABC):
         }
 
     @property
-    def routes(self):
+    def routes(self) -> t.Tuple[Route, ...]:
         return tuple(
             [route for group in self.groups.values() for route in group]
         )
 
-    def _optimize(self, node) -> None:
+    def _optimize(self, node: t.Any) -> None:
         warn(
             "Router AST optimization is an experimental only feature. "
             "Results may vary from unoptimized code."
@@ -608,13 +609,13 @@ class BaseRouter(ABC):
                 self._optimize(child)
 
     @staticmethod
-    def _is_lone_if(node):
+    def _is_lone_if(node: t.Any):
         return len(node.body) == 1 and isinstance(node.body[0], ast.If)
 
-    def _is_regex(self, path: str):
+    def _is_regex(self, path: str) -> bool:
         parts = path_to_parts(path, self.delimiter)
 
-        def requires(part):
+        def requires(part: str) -> bool:
             if not part.startswith("<") or ":" not in part:
                 return False
 
