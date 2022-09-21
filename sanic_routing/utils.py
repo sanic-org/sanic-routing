@@ -10,7 +10,7 @@ if TYPE_CHECKING:
     from .route import Route
 
 
-class Immutable(Dict[str, str]):
+class Immutable(Dict[Any, Any]):
     def __setitem__(self, *args: Any) -> NoReturn:
         raise TypeError("Cannot change immutable dict")
 
