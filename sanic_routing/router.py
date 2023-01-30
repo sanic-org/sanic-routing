@@ -89,7 +89,7 @@ class BaseRouter(ABC):
         except (NotFound, NoMethod) as e:
             # If we did not find the route, we might need to try routing one
             # more time to handle strict_slashes
-            if path.endswith(self.delimiter):
+            if len(path) > 1 and path.endswith(self.delimiter):
                 return self.resolve(
                     path=path[:-1],
                     method=method,
