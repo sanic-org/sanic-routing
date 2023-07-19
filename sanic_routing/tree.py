@@ -3,7 +3,7 @@ from logging import getLogger
 
 from .group import RouteGroup
 from .line import Line
-from .patterns import REGEX_PARAM_NAME, REGEX_PARAM_NAME_EXT
+from .patterns import REGEX_PARAM_NAME, REGEX_PARAM_NAME_EXT, alpha, ext, slug
 
 logger = getLogger("sanic.root")
 
@@ -16,6 +16,7 @@ class Node:
         parent=None,
         router=None,
         param=None,
+        unquote=False,
     ) -> None:
         self.root = root
         self.part = part
@@ -34,7 +35,7 @@ class Node:
         self.children_param_injected = False
         self.has_deferred = False
         self.equality_check = False
-        self.unquote = False
+        self.unquote = unquote
         self.router = router
 
     def __str__(self) -> str:
@@ -50,11 +51,7 @@ class Node:
 
     @property
     def ident(self) -> str:
-        prefix = (
-            f"{self.parent.ident}."
-            if self.parent and not self.parent.root
-            else ""
-        )
+        prefix = f"{self.parent.ident}." if self.parent and not self.parent.root else ""
         return f"{prefix}{self.idx}"
 
     @property
@@ -229,9 +226,7 @@ class Node:
                 # This is for any inline regex routes. It sould not include,
                 # path or path-like routes.
                 if group.regex:
-                    self._inject_regex(
-                        location, return_indent + group_bump, group
-                    )
+                    self._inject_regex(location, return_indent + group_bump, group)
                     group_bump += 1
 
                 # Since routes are grouped, we need to know which to select
@@ -268,7 +263,7 @@ class Node:
             Line("pass", indent + 1),
             Line("else:", indent),
         ]
-        if self.unquote:
+        if self.unquote and self._cast_as_str(self.param.cast):
             lines.append(
                 Line(
                     f"basket['__matches__'][{idx}] = "
@@ -279,6 +274,11 @@ class Node:
         self.base_indent += 1
 
         location.extend(lines)
+
+    @staticmethod
+    def _cast_as_str(cast) -> bool:
+        return_type_hint = t.get_type_hints(cast).get("return")
+        return cast in (str, ext, slug, alpha) or return_type_hint is str
 
     @staticmethod
     def _inject_method_check(location, indent, group):
@@ -358,10 +358,7 @@ class Node:
         location.extend(
             [
                 Line(
-                    (
-                        "match = router.matchers"
-                        f"[{group.pattern_idx}].match(path)"
-                    ),
+                    ("match = router.matchers" f"[{group.pattern_idx}].match(path)"),
                     indent,
                 ),
                 Line("if match:", indent),
@@ -387,9 +384,7 @@ class Node:
             type_ * -1,
             child.depth * -1,
             len(child._children),
-            not bool(
-                child.groups and any(group.regex for group in child.groups)
-            ),
+            not bool(child.groups and any(group.regex for group in child.groups)),
             key,
         )
 
@@ -406,9 +401,7 @@ class Node:
                 if ":" in key:
                     key, param_type = key.split(":", 1)
                     try:
-                        type_ = list(self.router.regex_types.keys()).index(
-                            param_type
-                        )
+                        type_ = list(self.router.regex_types.keys()).index(param_type)
                     except ValueError:
                         type_ = len(list(self.router.regex_types.keys()))
             return type_ * -1
@@ -436,6 +429,7 @@ class Tree:
         """
         for group in groups:
             current = self.root
+            current.unquote = current.unquote or group.unquote
             for level, part in enumerate(group.parts):
                 param = None
                 dynamic = part.startswith("<")
@@ -452,6 +446,7 @@ class Tree:
                         parent=current,
                         router=self.router,
                         param=param,
+                        unquote=current.unquote,
                     )
                     child.dynamic = dynamic
                     current.add_child(child)
@@ -459,7 +454,6 @@ class Tree:
                 current.level = level + 1
 
             current.groups.append(group)
-            current.unquote = current.unquote or group.unquote
 
     def display(self) -> None:
         """

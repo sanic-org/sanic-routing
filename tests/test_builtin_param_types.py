@@ -1,6 +1,7 @@
 from unittest.mock import Mock
 
 import pytest
+
 from sanic_routing import BaseRouter
 from sanic_routing.exceptions import InvalidUsage, NotFound
 

@@ -3,7 +3,7 @@ import typing as t
 import uuid
 from datetime import date, datetime
 from types import SimpleNamespace
-from typing import Any, Callable, Dict, Pattern, Tuple, Type
+from typing import Any, Callable, Dict, Pattern, Tuple, Type, get_type_hints
 
 from sanic_routing.exceptions import InvalidUsage, NotFound
 
@@ -86,8 +86,7 @@ class ExtParamInfo(ParamInfo):
             )
         if match.group(2) == "path":
             raise InvalidUsage(
-                "Extension parameter matching does not support the "
-                "`path` type."
+                "Extension parameter matching does not support the " "`path` type."
             )
         ext_type = match.group(3)
         regex_type = REGEX_TYPES.get(match.group(2))
@@ -133,9 +132,7 @@ class ExtParamInfo(ParamInfo):
 
 
 EXTENSION = r"[a-z0-9](?:[a-z0-9\.]*[a-z0-9])?"
-PARAM_EXT = (
-    r"<([a-zA-Z_][a-zA-Z0-9_]*)(?:=([a-z]+))?(?::ext(?:=([a-z0-9|\.]+))?)>"
-)
+PARAM_EXT = r"<([a-zA-Z_][a-zA-Z0-9_]*)(?:=([a-z]+))?(?::ext(?:=([a-z0-9|\.]+))?)>"
 REGEX_PARAM_NAME = re.compile(r"^<([a-zA-Z_][a-zA-Z0-9_]*)(?::(.*))?>$")
 REGEX_PARAM_EXT_PATH = re.compile(PARAM_EXT)
 REGEX_PARAM_NAME_EXT = re.compile(r"^" + PARAM_EXT + r"$")
