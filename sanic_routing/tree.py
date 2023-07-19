@@ -51,7 +51,11 @@ class Node:
 
     @property
     def ident(self) -> str:
-        prefix = f"{self.parent.ident}." if self.parent and not self.parent.root else ""
+        prefix = (
+            f"{self.parent.ident}."
+            if self.parent and not self.parent.root
+            else ""
+        )
         return f"{prefix}{self.idx}"
 
     @property
@@ -226,7 +230,9 @@ class Node:
                 # This is for any inline regex routes. It sould not include,
                 # path or path-like routes.
                 if group.regex:
-                    self._inject_regex(location, return_indent + group_bump, group)
+                    self._inject_regex(
+                        location, return_indent + group_bump, group
+                    )
                     group_bump += 1
 
                 # Since routes are grouped, we need to know which to select
@@ -358,7 +364,10 @@ class Node:
         location.extend(
             [
                 Line(
-                    ("match = router.matchers" f"[{group.pattern_idx}].match(path)"),
+                    (
+                        "match = router.matchers"
+                        f"[{group.pattern_idx}].match(path)"
+                    ),
                     indent,
                 ),
                 Line("if match:", indent),
@@ -384,7 +393,9 @@ class Node:
             type_ * -1,
             child.depth * -1,
             len(child._children),
-            not bool(child.groups and any(group.regex for group in child.groups)),
+            not bool(
+                child.groups and any(group.regex for group in child.groups)
+            ),
             key,
         )
 
@@ -401,7 +412,9 @@ class Node:
                 if ":" in key:
                     key, param_type = key.split(":", 1)
                     try:
-                        type_ = list(self.router.regex_types.keys()).index(param_type)
+                        type_ = list(self.router.regex_types.keys()).index(
+                            param_type
+                        )
                     except ValueError:
                         type_ = len(list(self.router.regex_types.keys()))
             return type_ * -1

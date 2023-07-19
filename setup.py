@@ -16,7 +16,9 @@ def open_local(paths, mode="r", encoding="utf8"):
 
 with open_local(["sanic_routing", "__init__.py"], encoding="latin1") as fp:
     try:
-        version = re.findall(r"^__version__ = \"([^']+)\"\r?$", fp.read(), re.M)[0]
+        version = re.findall(
+            r"^__version__ = \"([^']+)\"\r?$", fp.read(), re.M
+        )[0]
     except IndexError:
         raise RuntimeError("Unable to determine version.")
 

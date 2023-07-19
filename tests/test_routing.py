@@ -146,7 +146,9 @@ def test_conditional_check_proper_compile(handler):
     router.add("/<foo>/", handler, strict=True)
 
     with pytest.raises(RouteExists):
-        router.add("/<foo>/", handler, strict=True, requirements={"foo": "bar"})
+        router.add(
+            "/<foo>/", handler, strict=True, requirements={"foo": "bar"}
+        )
     router.finalize()
 
     assert router.finalized
@@ -190,12 +192,16 @@ def test_use_param_name_with_casing(handler, param_name):
 def test_use_route_contains_children(handler):
     router = Router()
     router.add("/foo/<foo_id>/bars_ids", handler)
-    router.add("/foo/<foo_id>/bars_ids/<bar_id>/settings/<group_id>/groups", handler)
+    router.add(
+        "/foo/<foo_id>/bars_ids/<bar_id>/settings/<group_id>/groups", handler
+    )
 
     router.finalize()
 
     bars_ids = router.get("/foo/123/bars_ids", "BASE")
-    bars_ids_groups = router.get("/foo/123/bars_ids/321/settings/111/groups", "BASE")
+    bars_ids_groups = router.get(
+        "/foo/123/bars_ids/321/settings/111/groups", "BASE"
+    )
 
     bars_ids_retval = bars_ids[1](**bars_ids[2])
     assert isinstance(bars_ids_retval, str)
@@ -216,7 +222,9 @@ def test_use_route_with_different_depth(handler):
     router.add("/foo/<foo_id>/bars/<bar_id>/settings", handler)
     router.add("/foo/<foo_id>/bars_ids", handler)
     router.add("/foo/<foo_id>/bars_ids/<bar_id>/settings", handler)
-    router.add("/foo/<foo_id>/bars_ids/<bar_id>/settings/<group_id>/groups", handler)
+    router.add(
+        "/foo/<foo_id>/bars_ids/<bar_id>/settings/<group_id>/groups", handler
+    )
 
     router.finalize()
 
@@ -462,7 +470,9 @@ def test_identical_path_routes_with_different_methods_complex(uri):
     router = Router()
     router.add("/<foo:path>", handler1, methods=["OPTIONS"])
     router.add("/api/<version:int>/hello_world", handler2, methods=["POST"])
-    router.add("/api/<version:int>/hello_world/<foo:path>", handler2, methods=["GET"])
+    router.add(
+        "/api/<version:int>/hello_world/<foo:path>", handler2, methods=["GET"]
+    )
     router.finalize()
 
     _, handler, params = router.get(f"/{uri}", "OPTIONS")
@@ -491,9 +501,15 @@ def test_identical_path_routes_with_different_methods_similar_urls(uri):
 
     # test root level path with different methods
     router = Router()
-    router.add("/constant/<foo:path>/story", handler1, methods=["GET", "OPTIONS"])
-    router.add("/constant/<foo:path>/tracker/events", handler2, methods=["PUT"])
-    router.add("/constant/<foo:path>/tracker/events", handler3, methods=["POST"])
+    router.add(
+        "/constant/<foo:path>/story", handler1, methods=["GET", "OPTIONS"]
+    )
+    router.add(
+        "/constant/<foo:path>/tracker/events", handler2, methods=["PUT"]
+    )
+    router.add(
+        "/constant/<foo:path>/tracker/events", handler3, methods=["POST"]
+    )
     router.finalize()
 
     route, handler, params = router.get(f"/constant/{uri}/story", "GET")
