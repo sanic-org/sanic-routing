@@ -3,7 +3,7 @@ import typing as t
 import uuid
 from datetime import date, datetime
 from types import SimpleNamespace
-from typing import Any, Callable, Dict, Pattern, Tuple, Type, get_type_hints
+from typing import Any, Callable, Dict, Pattern, Tuple, Type
 
 from sanic_routing.exceptions import InvalidUsage, NotFound
 
