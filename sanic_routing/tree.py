@@ -3,7 +3,7 @@ from logging import getLogger
 
 from .group import RouteGroup
 from .line import Line
-from .patterns import REGEX_PARAM_NAME, REGEX_PARAM_NAME_EXT
+from .patterns import REGEX_PARAM_NAME, REGEX_PARAM_NAME_EXT, alpha, ext, slug
 
 logger = getLogger("sanic.root")
 
@@ -16,6 +16,7 @@ class Node:
         parent=None,
         router=None,
         param=None,
+        unquote=False,
     ) -> None:
         self.root = root
         self.part = part
@@ -34,7 +35,7 @@ class Node:
         self.children_param_injected = False
         self.has_deferred = False
         self.equality_check = False
-        self.unquote = False
+        self.unquote = unquote
         self.router = router
 
     def __str__(self) -> str:
@@ -268,7 +269,7 @@ class Node:
             Line("pass", indent + 1),
             Line("else:", indent),
         ]
-        if self.unquote:
+        if self.unquote and self._cast_as_str(self.param.cast):
             lines.append(
                 Line(
                     f"basket['__matches__'][{idx}] = "
@@ -279,6 +280,11 @@ class Node:
         self.base_indent += 1
 
         location.extend(lines)
+
+    @staticmethod
+    def _cast_as_str(cast) -> bool:
+        return_type_hint = t.get_type_hints(cast).get("return")
+        return cast in (str, ext, slug, alpha) or return_type_hint is str
 
     @staticmethod
     def _inject_method_check(location, indent, group):
@@ -436,6 +442,7 @@ class Tree:
         """
         for group in groups:
             current = self.root
+            current.unquote = current.unquote or group.unquote
             for level, part in enumerate(group.parts):
                 param = None
                 dynamic = part.startswith("<")
@@ -452,6 +459,7 @@ class Tree:
                         parent=current,
                         router=self.router,
                         param=param,
+                        unquote=current.unquote,
                     )
                     child.dynamic = dynamic
                     current.add_child(child)
@@ -459,7 +467,6 @@ class Tree:
                 current.level = level + 1
 
             current.groups.append(group)
-            current.unquote = current.unquote or group.unquote
 
     def display(self) -> None:
         """
