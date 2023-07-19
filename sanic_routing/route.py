@@ -74,7 +74,7 @@ class Route:
         name: str,
         handler: t.Callable[..., t.Any],
         methods: t.Union[t.Sequence[str], t.FrozenSet[str]],
-        requirements: t.Dict[str, t.Any] = None,
+        requirements: t.Optional[t.Dict[str, t.Any]] = None,
         strict: bool = False,
         unquote: bool = False,
         static: bool = False,
