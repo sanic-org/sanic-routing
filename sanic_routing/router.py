@@ -84,7 +84,7 @@ class BaseRouter(ABC):
                 method,
                 self,
                 {"__params__": {}, "__matches__": {}},
-                extra,
+                extra or {},
             )
         except (NotFound, NoMethod) as e:
             # If we did not find the route, we might need to try routing one
@@ -241,8 +241,7 @@ class BaseRouter(ABC):
             if route.segments in routes:
                 existing_group = routes[route.segments]
                 group.merge(existing_group, overwrite, append)
-
-            routes[route.segments] = group
+        routes[route.segments] = group
 
         if name:
             self.name_index[name] = route

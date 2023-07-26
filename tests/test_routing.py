@@ -147,7 +147,7 @@ def test_conditional_check_proper_compile(handler):
 
     with pytest.raises(RouteExists):
         router.add(
-            "/<foo>/", handler, strict=True, requirements={"foo": "bar"}
+            "/<foo>/", handler, strict=True,
         )
     router.finalize()
 
@@ -522,4 +522,49 @@ def test_identical_path_routes_with_different_methods_similar_urls(uri):
 
     _, handler, params = router.get(f"/constant/{uri}/tracker/events", "POST")
     assert params == {"foo": f"{uri}"}
+    assert handler() == "handler3"
+
+
+def test_multiple_requirements():
+    def handler1():
+        return "handler1"
+
+    def handler2():
+        return "handler2"
+
+    def handler3():
+        return "handler3"
+
+    router = Router()
+
+    # more specific: allowed
+    router.add('/foo', handler1)
+    router.add('/foo', handler2, requirements={'a': 42})
+
+    # potentially ambiguous: disallowed
+    with pytest.raises(RouteExists):
+        router.add('/foo', handler2, requirements={'c': 56})
+
+    # more specific: allowed
+    router.add('/foo', handler3, requirements={'a': 42, 'b': 56})
+
+    # overlap, but still ambiguous: disallowed
+    with pytest.raises(RouteExists):
+        router.add('/foo', handler3, requirements={'b': 66})
+
+    router.finalize()
+
+    _, handler, _ = router.get('/foo', "BASE")
+    assert handler() == "handler1"
+
+    _, handler, _ = router.get('/foo', "BASE", extra={'a': 42})
+    assert handler() == "handler2"
+
+    _, handler, _ = router.get('/foo', "BASE", extra={'a': 42, 'b': 69})
+    assert handler() == "handler2"
+
+    _, handler, _ = router.get('/foo', "BASE", extra={'a': 42, 'c': 56})
+    assert handler() == "handler2"
+
+    _, handler, _ = router.get('/foo', "BASE", extra={'a': 42, 'b': 56})
     assert handler() == "handler3"
