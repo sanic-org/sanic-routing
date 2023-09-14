@@ -157,6 +157,8 @@ class BaseRouter(ABC):
         unquote: bool = False,  # noqa
         overwrite: bool = False,
         append: bool = False,
+        *,
+        priority: int = 0,
     ) -> Route:
         # Can add a route with overwrite, or append, not both.
         # - overwrite: if matching path exists, replace it
@@ -165,6 +167,10 @@ class BaseRouter(ABC):
             raise FinalizationError(
                 "Cannot add a route with both overwrite and append equal "
                 "to True"
+            )
+        if priority and not append:
+            raise FinalizationError(
+                "Cannot add a route with priority if append is False"
             )
         if not methods:
             methods = [self.DEFAULT_METHOD]
@@ -223,6 +229,7 @@ class BaseRouter(ABC):
             unquote=unquote,
             static=static,
             regex=regex,
+            priority=priority,
         )
         group = self.group_class(route)
 
@@ -327,6 +334,7 @@ class BaseRouter(ABC):
             group.finalize()
             for route in group.routes:
                 route.finalize()
+            group.prioritize_routes()
 
         # Evaluates all of the paths and arranges them into a hierarchichal
         # tree of nodes
