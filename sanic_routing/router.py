@@ -96,7 +96,7 @@ class BaseRouter(ABC):
                     orig=path,
                     extra=extra,
                 )
-            raise self.exception(str(e), path=path)
+            raise e.__class__(str(e), path=path)
 
         if isinstance(route, RouteGroup):
             try:
