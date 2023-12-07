@@ -104,6 +104,16 @@ class RouteGroup:
             }
         )
 
+    def prioritize_routes(self) -> None:
+        """
+        Sorts the routes in the group by priority
+        """
+        self._routes = tuple(
+            sorted(
+                self._routes, key=lambda route: route.priority, reverse=True
+            )
+        )
+
     def reset(self):
         self.methods_index = dict(self.methods_index)
 
@@ -163,6 +173,9 @@ class RouteGroup:
                         )
                 else:
                     _routes.append(other_route)
+                    _routes.sort(
+                        key=lambda route: route.priority, reverse=True
+                    )
         self._routes = tuple(_routes)
 
     @property

@@ -1,4 +1,5 @@
 import re
+
 from urllib.parse import quote, unquote
 
 from sanic_routing.exceptions import InvalidUsage
