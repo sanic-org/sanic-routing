@@ -1,5 +1,6 @@
 import re
 import typing as t
+
 from types import SimpleNamespace
 from warnings import warn
 
@@ -204,7 +205,11 @@ class Route:
             pattern = re.compile(pattern)
 
         is_regex = label not in self.router.regex_types
-        priority = 0 if is_regex else list(self.router.regex_types.keys()).index(label)
+        priority = (
+            0
+            if is_regex
+            else list(self.router.regex_types.keys()).index(label)
+        )
         self._params[idx] = param_info_class(
             name=name,
             raw_path=raw_path,
@@ -229,8 +234,12 @@ class Route:
             sorted(params.items(), key=lambda param: self._sorting(param[1]))
         )
 
-        if not self.regex and any(":" in param.label for param in self.params.values()):
-            raise InvalidUsage(f"Invalid parameter declaration: {self.raw_path}")
+        if not self.regex and any(
+            ":" in param.label for param in self.params.values()
+        ):
+            raise InvalidUsage(
+                f"Invalid parameter declaration: {self.raw_path}"
+            )
 
     def _compile_regex(self):
         components = []
@@ -266,7 +275,9 @@ class Route:
             else:
                 components.append(part)
 
-        self.pattern = self.router.delimiter + self.router.delimiter.join(components)
+        self.pattern = self.router.delimiter + self.router.delimiter.join(
+            components
+        )
 
     def finalize(self):
         self._finalize_params()
@@ -329,7 +340,7 @@ class Route:
         :param parameter_string: String to parse
         :return: tuple containing
             (parameter_name, parameter_type, parameter_pattern)
-        """
+        """  # noqa: E501
         # We could receive NAME or NAME:PATTERN
         parameter_string = parameter_string.strip("<>")
         name = parameter_string
@@ -343,7 +354,9 @@ class Route:
                 name, _ = name.split("=", 1)
 
             if not name:
-                raise ValueError(f"Invalid parameter syntax: {parameter_string}")
+                raise ValueError(
+                    f"Invalid parameter syntax: {parameter_string}"
+                )
             if label == "string":
                 warn(
                     "Use of 'string' as a path parameter type is deprected, "

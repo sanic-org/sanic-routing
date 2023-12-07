@@ -1,4 +1,5 @@
 import re
+
 from urllib.parse import quote, unquote
 
 from sanic_routing.exceptions import InvalidUsage
@@ -85,7 +86,8 @@ def parts_to_path(parts, delimiter="/"):
                     if match.group(3):
                         extension_type = f"={match.group(3)}"
                     segment = (
-                        f"<{match.group(1)}{filename_type}:" f"ext{extension_type}>"
+                        f"<{match.group(1)}{filename_type}:"
+                        f"ext{extension_type}>"
                     )
                     path.append(segment)
                 except AttributeError:

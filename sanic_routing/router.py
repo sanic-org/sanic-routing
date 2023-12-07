@@ -1,6 +1,7 @@
 import ast
 import sys
 import typing as t
+
 from abc import ABC, abstractmethod
 from types import SimpleNamespace
 from warnings import warn
@@ -20,6 +21,7 @@ from .patterns import REGEX_TYPES, REGEX_TYPES_ANNOTATION
 from .route import Route
 from .tree import Node, Tree
 from .utils import parts_to_path, path_to_parts
+
 
 # The below functions might be called by the compiled source code, and
 # therefore should be made available here by import
@@ -125,7 +127,9 @@ class BaseRouter(ABC):
                 # Apply if tuple (from ext) or if it is not a regex matcher
                 if isinstance(value, tuple):
                     param.process(params, value)
-                elif not route.regex or (route.regex and param.cast is not str):
+                elif not route.regex or (
+                    route.regex and param.cast is not str
+                ):
                     params[param.name] = value
 
         # Double check that if we made a match it is not a false positive
@@ -146,7 +150,9 @@ class BaseRouter(ABC):
         self,
         path: str,
         handler: t.Callable,
-        methods: t.Optional[t.Union[t.Sequence[str], t.FrozenSet[str], str]] = None,
+        methods: t.Optional[
+            t.Union[t.Sequence[str], t.FrozenSet[str], str]
+        ] = None,
         name: t.Optional[str] = None,
         requirements: t.Optional[t.Dict[str, t.Any]] = None,
         strict: bool = False,
@@ -161,7 +167,8 @@ class BaseRouter(ABC):
         # - append: if matching path exists, append handler to it
         if overwrite and append:
             raise FinalizationError(
-                "Cannot add a route with both overwrite and append equal " "to True"
+                "Cannot add a route with both overwrite and append equal "
+                "to True"
             )
         if priority and not append:
             raise FinalizationError(
@@ -178,7 +185,11 @@ class BaseRouter(ABC):
         if self.ALLOWED_METHODS and any(
             method not in self.ALLOWED_METHODS for method in methods
         ):
-            bad = [method for method in methods if method not in self.ALLOWED_METHODS]
+            bad = [
+                method
+                for method in methods
+                if method not in self.ALLOWED_METHODS
+            ]
             raise BadMethod(
                 f"Bad method: {bad}. Must be one of: {self.ALLOWED_METHODS}"
             )
@@ -201,7 +212,9 @@ class BaseRouter(ABC):
             routes = self.dynamic_routes
 
         # Only URL encode the static parts of the path
-        path = parts_to_path(path_to_parts(path, self.delimiter), self.delimiter)
+        path = parts_to_path(
+            path_to_parts(path, self.delimiter), self.delimiter
+        )
 
         # We need to clean off the delimiters are the beginning, and maybe the
         # end, depending upon whether we are in strict mode
@@ -376,7 +389,9 @@ class BaseRouter(ABC):
         self.tree.generate(self._get_non_static_non_path_groups(False))
         self.tree.finalize()
 
-    def _render(self, do_compile: bool = True, do_optimize: bool = False) -> None:
+    def _render(
+        self, do_compile: bool = True, do_optimize: bool = False
+    ) -> None:
         # Initial boilerplate for the function source
         src = [
             Line("def find_route(path, method, router, basket, extra):", 0),
@@ -435,7 +450,9 @@ class BaseRouter(ABC):
 
         # Inject regex matching that could not be in the tree
         for group in self._get_non_static_non_path_groups(True):
-            route_container = "regex_routes" if group.regex else "dynamic_routes"
+            route_container = (
+                "regex_routes" if group.regex else "dynamic_routes"
+            )
             route_idx: t.Union[str, int] = 0
             holder: t.List[Line] = []
 
@@ -472,7 +489,9 @@ class BaseRouter(ABC):
         src.append(Line("raise NotFound", 1))
         src.extend(delayed)
 
-        self.find_route_src = "".join(map(str, filter(lambda x: x.render, src)))
+        self.find_route_src = "".join(
+            map(str, filter(lambda x: x.render, src))
+        )
         if do_compile:
             try:
                 syntax_tree = ast.parse(self.find_route_src)
@@ -532,7 +551,9 @@ class BaseRouter(ABC):
 
     @property
     def routes(self):
-        return tuple([route for group in self.groups.values() for route in group])
+        return tuple(
+            [route for group in self.groups.values() for route in group]
+        )
 
     def _optimize(self, node) -> None:
         warn(
@@ -559,7 +580,9 @@ class BaseRouter(ABC):
                 for test in [current.test, nested.test]:
                     if isinstance(test, ast.Compare):
                         values.append(test)
-                    elif isinstance(test, ast.BoolOp) and isinstance(test.op, ast.And):
+                    elif isinstance(test, ast.BoolOp) and isinstance(
+                        test.op, ast.And
+                    ):
                         values.extend(test.values)
                     else:
                         ...

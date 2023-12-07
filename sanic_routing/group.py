@@ -70,7 +70,9 @@ class RouteGroup:
         self.pattern_idx = 0
 
     def __str__(self):
-        display = f"path={self.path or self.router.delimiter} len={len(self.routes)}"
+        display = (
+            f"path={self.path or self.router.delimiter} len={len(self.routes)}"
+        )
         return f"<{self.__class__.__name__}: {display}>"
 
     def __repr__(self) -> str:
@@ -95,7 +97,11 @@ class RouteGroup:
 
     def finalize(self):
         self.methods_index = Immutable(
-            {method: route for route in self._routes for method in route.methods}
+            {
+                method: route
+                for route in self._routes
+                for method in route.methods
+            }
         )
 
     def prioritize_routes(self) -> None:
@@ -103,7 +109,9 @@ class RouteGroup:
         Sorts the routes in the group by priority
         """
         self._routes = tuple(
-            sorted(self._routes, key=lambda route: route.priority, reverse=True)
+            sorted(
+                self._routes, key=lambda route: route.priority, reverse=True
+            )
         )
 
     def reset(self):
@@ -149,8 +157,14 @@ class RouteGroup:
             for current_route in self:
                 if (
                     current_route == other_route
-                    or (current_route.requirements and not other_route.requirements)
-                    or (not current_route.requirements and other_route.requirements)
+                    or (
+                        current_route.requirements
+                        and not other_route.requirements
+                    )
+                    or (
+                        not current_route.requirements
+                        and other_route.requirements
+                    )
                 ) and not append:
                     if not overwrite:
                         raise RouteExists(
@@ -159,7 +173,9 @@ class RouteGroup:
                         )
                 else:
                     _routes.append(other_route)
-                    _routes.sort(key=lambda route: route.priority, reverse=True)
+                    _routes.sort(
+                        key=lambda route: route.priority, reverse=True
+                    )
         self._routes = tuple(_routes)
 
     @property
@@ -179,7 +195,9 @@ class RouteGroup:
     @property
     def methods(self) -> FrozenSet[str]:
         """"""
-        return frozenset([method for route in self for method in route.methods])
+        return frozenset(
+            [method for route in self for method in route.methods]
+        )
 
     @property
     def routes(self) -> Sequence[Route]:
