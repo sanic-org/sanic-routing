@@ -109,9 +109,7 @@ class RouteGroup:
         Sorts the routes in the group by priority
         """
         self._routes = tuple(
-            sorted(
-                self._routes, key=lambda route: route.priority, reverse=True
-            )
+            sorted(self._routes, key=lambda route: route.priority)
         )
 
     def reset(self):
