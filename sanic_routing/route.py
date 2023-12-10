@@ -1,5 +1,6 @@
 import re
 import typing as t
+
 from types import SimpleNamespace
 from warnings import warn
 
@@ -28,6 +29,7 @@ class Route:
         "parts",
         "path",
         "pattern",
+        "priority",
         "regex",
         "requirements",
         "router",
@@ -80,12 +82,15 @@ class Route:
         static: bool = False,
         regex: bool = False,
         overloaded: bool = False,
+        *,
+        priority: int = 0,
     ):
         self.router = router
         self.name = name
         self.handler = handler  # type: ignore
         self.methods = frozenset(methods)
         self.requirements = Requirements(requirements or {})
+        self.priority = priority
 
         self.ctx = SimpleNamespace()
         self.extra = SimpleNamespace()
@@ -326,15 +331,16 @@ class Route:
         """Parse a parameter string into its constituent name, type, and
         pattern
 
-        For example::
+        For example:
 
-            parse_parameter_string('<param_one:[A-z]>')` ->
-                ('param_one', '[A-z]', <class 'str'>, '[A-z]')
+        ```text
+        parse_parameter_string('<param_one:[A-z]>')` -> ('param_one', '[A-z]', <class 'str'>, '[A-z]')
+        ```
 
         :param parameter_string: String to parse
         :return: tuple containing
             (parameter_name, parameter_type, parameter_pattern)
-        """
+        """  # noqa: E501
         # We could receive NAME or NAME:PATTERN
         parameter_string = parameter_string.strip("<>")
         name = parameter_string

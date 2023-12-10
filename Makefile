@@ -8,7 +8,13 @@ test:
 test-cov:
 	${PYTEST} --cov sanic_routing
 
+.PHONY: fix
+fix:
+	ruff check sanic_routing --fix
+
+.PHONY: format
+format:
+	ruff format sanic_routing
+
 .PHONY: pretty
-pretty:
-	black --line-length 79 sanic_routing tests
-	isort --line-length 79 sanic_routing tests --profile=black
+pretty: fix format

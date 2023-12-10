@@ -1,9 +1,11 @@
 import typing as t
+
 from logging import getLogger
 
 from .group import RouteGroup
 from .line import Line
 from .patterns import REGEX_PARAM_NAME, REGEX_PARAM_NAME_EXT, alpha, ext, slug
+
 
 logger = getLogger("sanic.root")
 

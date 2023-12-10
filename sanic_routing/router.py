@@ -1,6 +1,7 @@
 import ast
 import sys
 import typing as t
+
 from abc import ABC, abstractmethod
 from types import SimpleNamespace
 from warnings import warn
@@ -20,6 +21,7 @@ from .patterns import REGEX_TYPES, REGEX_TYPES_ANNOTATION
 from .route import Route
 from .tree import Node, Tree
 from .utils import parts_to_path, path_to_parts
+
 
 # The below functions might be called by the compiled source code, and
 # therefore should be made available here by import
@@ -157,6 +159,8 @@ class BaseRouter(ABC):
         unquote: bool = False,  # noqa
         overwrite: bool = False,
         append: bool = False,
+        *,
+        priority: int = 0,
     ) -> Route:
         # Can add a route with overwrite, or append, not both.
         # - overwrite: if matching path exists, replace it
@@ -165,6 +169,10 @@ class BaseRouter(ABC):
             raise FinalizationError(
                 "Cannot add a route with both overwrite and append equal "
                 "to True"
+            )
+        if priority and not append:
+            raise FinalizationError(
+                "Cannot add a route with priority if append is False"
             )
         if not methods:
             methods = [self.DEFAULT_METHOD]
@@ -223,6 +231,7 @@ class BaseRouter(ABC):
             unquote=unquote,
             static=static,
             regex=regex,
+            priority=priority,
         )
         group = self.group_class(route)
 
@@ -327,6 +336,7 @@ class BaseRouter(ABC):
             group.finalize()
             for route in group.routes:
                 route.finalize()
+            group.prioritize_routes()
 
         # Evaluates all of the paths and arranges them into a hierarchichal
         # tree of nodes
