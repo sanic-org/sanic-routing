@@ -25,7 +25,7 @@ class NoMethod(BaseException):
         message: str = "Method does not exist",
         method: Optional[str] = None,
         allowed_methods: Optional[Set[str]] = None,
-        path: Optional[str] = None
+        path: Optional[str] = None,
     ):
         super().__init__(message)
         self.method = method
