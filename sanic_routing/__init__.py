@@ -3,5 +3,5 @@ from .route import Route
 from .router import BaseRouter
 
 
-__version__ = "23.6.1"
+__version__ = "23.12.0"
 __all__ = ("BaseRouter", "Route", "RouteGroup")
